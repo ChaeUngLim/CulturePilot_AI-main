@@ -1,0 +1,21 @@
+---
+config:
+  flowchart:
+    curve: linear
+---
+graph TD;
+	__start__([<p>__start__</p>]):::first
+	plan_facets(plan_facets)
+	facet_search(facet_search)
+	fuse_rerank(fuse_rerank)
+	extract_relevant(extract_relevant)
+	__end__([<p>__end__</p>]):::last
+	__start__ --> plan_facets;
+	facet_search --> fuse_rerank;
+	fuse_rerank --> extract_relevant;
+	plan_facets -.-> facet_search;
+	extract_relevant --> __end__;
+	classDef default fill:#f2f0ff,line-height:1.2
+	classDef first fill-opacity:0
+	classDef last fill:#bfb6fc
+

@@ -1,0 +1,62 @@
+{
+  "expo": {
+    "name": "CultureMate",
+    "slug": "culturemate",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "culturemate",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0F1115"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.culturemate.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "일정이 일찍 끝났을 때 주변 문화공간을 추천하기 위해 현재 위치를 사용합니다.",
+        "NSPhotoLibraryUsageDescription": "관람 기록에 사진을 첨부하기 위해 사진 보관함에 접근합니다."
+      }
+    },
+    "android": {
+      "package": "com.culturemate.app",
+      "adaptiveIcon": {
+        "backgroundImage": "./assets/android-icon-background.png",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png",
+        "backgroundColor": "#0F1115"
+      },
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ],
+      "edgeToEdgeEnabled": true
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "일정 조기 종료 시 주변 장소를 추천하기 위해 현재 위치를 사용합니다."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "관람 기록에 사진을 첨부합니다."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

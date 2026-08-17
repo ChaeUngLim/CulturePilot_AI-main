@@ -1,0 +1,80 @@
+# 프로젝트 이름을 서비스 이름과 다르게 둔다.
+# 같으면 Docker Desktop 목록에 'culturemate' 가 두 줄로 보인다 —
+# 하나는 compose 프로젝트 그룹 행(값이 전부 '-'), 하나는 실제 api 컨테이너.
+# 그룹 이름을 바꾸면 'culturemate' 는 api 컨테이너 한 줄만 남는다.
+name: culturemate-db
+
+services:
+  postgres:
+    # ⚠️ 메이저 버전을 바꾸면 기존 pgdata 볼륨으로는 기동하지 않는다.
+    #    Postgres 가 다른 메이저 버전이 만든 데이터 디렉터리를 거부하기 때문이다.
+    #    바꿀 때는 pg_dump 로 옮기거나 볼륨을 새로 만들어야 한다(docker compose down -v).
+    image: pgvector/pgvector:pg18
+    environment:
+      POSTGRES_USER: culturemate
+      POSTGRES_PASSWORD: culturemate
+      POSTGRES_DB: culturemate
+    ports: ["5432:5432"]
+    volumes:
+      # ⚠️ pg18 부터 마운트 지점이 바뀌었다. 이미지의 PGDATA 는
+      #    /var/lib/postgresql/18/docker 이고 선언된 볼륨은 /var/lib/postgresql 이다.
+      #    pg17 까지처럼 /var/lib/postgresql/data 에 걸면 그 경로를 아예 안 쓰기 때문에
+      #    "unused mount/volume" 로 기동이 거부된다. 메이저 버전별 하위 디렉터리를
+      #    쓰는 구조라서 나중에 pg_upgrade --link 도 이 마운트 하나로 가능하다.
+      - pgdata:/var/lib/postgresql
+      - ./db:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U culturemate"]
+      interval: 5s
+      retries: 10
+
+  api:
+    build: .
+    container_name: culturemate
+    # 기본 기동에서 제외한다(`docker compose up -d` 는 postgres 만 올린다).
+    #
+    # compose 로 띄우면 컨테이너에 com.docker.compose.project 라벨이 붙고,
+    # Docker Desktop 은 그 라벨로 컨테이너를 프로젝트 그룹 행 아래로 접는다.
+    # 그룹 행은 ID·이미지·포트를 집계하지 않아 전부 '-' 로 보인다 — 설정으로
+    # 바꿀 수 있는 게 아니라 Docker Desktop 의 표시 방식이다.
+    #
+    # 그래서 api 는 실행 스크립트에서 `docker run` 으로 띄운다. 라벨이 없으니
+    # postgres18 처럼 평평한 행으로 값이 그대로 나온다.
+    # compose 로 통째로 띄우고 싶으면: docker compose --profile compose up -d
+    profiles: ["compose"]
+    env_file: [.env]
+    environment:
+      PG_DSN: postgresql://culturemate:culturemate@postgres:5432/culturemate
+      # Windows 바인드 마운트에서는 inotify 가 동작하지 않아 감시자가
+      # 'Input/output error (os error 5)' 로 죽는다. 폴링으로 바꾸면 안정적이다.
+      WATCHFILES_FORCE_POLLING: "true"
+      WATCHFILES_POLL_DELAY: "2"
+    ports: ["8000:8000"]
+    # 코드를 컨테이너에 붙여 둔다. 이렇게 하지 않으면 파이썬 파일을 고칠 때마다
+    # 이미지를 다시 빌드(--build)해야 해서 개발 중에 2~3분씩 날아간다.
+    volumes:
+      - ./app:/srv/app
+      - ./scripts:/srv/scripts
+      - ./db:/srv/db
+    depends_on:
+      postgres: {condition: service_healthy}
+    # --reload: 코드가 바뀌면 uvicorn이 알아서 다시 읽는다
+    command: uvicorn app.api.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # 자체 호스팅 NIM을 쓸 때만 활성화 (GPU 필요)
+  # nim-chat:
+  #   image: nvcr.io/nim/meta/llama-3.3-70b-instruct:latest
+  #   environment: [NGC_API_KEY=${NVIDIA_API_KEY}]
+  #   ports: ["8001:8000"]
+  #   deploy: {resources: {reservations: {devices: [{capabilities: [gpu]}]}}}
+
+volumes:
+  pgdata:
+    # 프로젝트 이름이 바뀌어도 같은 볼륨을 쓰도록 못 박는다.
+    # 고정하지 않으면 culturemate-db_pgdata 가 새로 생기고 시드가 사라진다.
+    name: culturemate_pgdata
+
+networks:
+  default:
+    # api 를 docker run 으로 붙일 때 쓰는 이름이라 바뀌면 안 된다.
+    name: culturemate_default

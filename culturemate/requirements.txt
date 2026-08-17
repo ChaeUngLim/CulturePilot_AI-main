@@ -1,0 +1,32 @@
+# --- core orchestration ---
+langgraph>=1.0.0
+langgraph-checkpoint-postgres>=2.0.0
+langchain-core>=0.3.0
+
+# --- model providers ---
+# NIM 이 기본. 나머지는 .env 의 MODEL_* 접두사(`openai:gpt-4o-mini`)로 역할별 교체용.
+# 주석 처리해 두면 안 된다 — provider.py 가 조건부로 import 하므로, 설정만 바꾸고
+# 패키지가 없으면 ModuleNotFoundError 로 그 역할의 LLM 호출이 통째로 죽는다.
+langchain-nvidia-ai-endpoints>=0.3.0
+langchain-openai>=0.2.0
+# langchain-anthropic>=0.3.0
+
+# --- retrieval / search ---
+pgvector>=0.3.0
+psycopg[binary,pool]>=3.2.0
+langchain-tavily>=0.1.0
+# Tavily 무료 쿼터가 떨어졌을 때 넘어갈 대체 검색. EXA_API_KEY 가 있으면 쓴다.
+exa-py>=1.0.0
+
+# --- api ---
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+httpx>=0.27.0
+pydantic>=2.9.0
+pydantic-settings>=2.5.0
+sse-starlette>=2.1.0
+
+# --- dev ---
+pytest>=8.3.0
+pytest-asyncio>=0.24.0
+ruff>=0.7.0
