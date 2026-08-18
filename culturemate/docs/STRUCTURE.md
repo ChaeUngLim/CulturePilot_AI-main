@@ -674,7 +674,7 @@ app/
     build.py             그래프 조립 (여기서 전체 흐름을 읽는다)
     router/              2단계 — 요청 이해 + 좌표 확정
       __init__.py          라우팅 표 · classify · fan_out
-      detect.py            지역·지점·개수·종류별 몫 탐지   ★ 266줄
+      detect.py            지역·지점·개수·종류별 몫 탐지   ★ 295줄
       endpoints.py         출발·도착 절 분리              ★ 248줄
       rules.py             규칙 파서 순서 · LLM 결과 병합
       timeparse.py         시각·체류시간 표현
@@ -689,7 +689,7 @@ app/
       discovery.py       후보 탐색 + 검증
       itinerary/         일정 편성
         __init__.py        서브그래프 조립 · 공개 이름
-        schedule.py        순서·시각 배치                ★ 258줄
+        schedule.py        순서·시각 배치                ★ 264줄
         placement.py       하루 경계 · 배치 판단 · 쿼터   ★ 236줄
         legs.py            구간 이동 측정 · 최단루트
         gaps.py            공백 탐지 → 주변 추천 → 채우기

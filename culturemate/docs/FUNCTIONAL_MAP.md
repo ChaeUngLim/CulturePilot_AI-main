@@ -131,7 +131,7 @@ UR-09 에서 똑같이 밟은 함정이다.
 |---|---|
 | **입력** | 자연어 발화 + 화면 칩(출발/도착/시각/이동수단/지역) |
 | **출력** | `TripConditions` (좌표 확정 포함) · `RequestType` · `PlanFlags` |
-| **코드** | `app/graph/router/` (6모듈, 최대 266줄) — `__init__.classify` · `rules.py` |
+| **코드** | `app/graph/router/` (6모듈, 최대 295줄) — `__init__.classify` · `rules.py` |
 | **화면** | `Composer.tsx` · `RoutePoints.tsx` · `TransportPicker.tsx` · `RegionPicker.tsx` |
 
 **처리 순서** (`classify` 내부, 순서가 곧 우선순위)
@@ -231,7 +231,7 @@ excluded     불일치·종료 확인        → 제외
 
 | | |
 |---|---|
-| **코드** | `app/graph/subgraphs/itinerary/` (9모듈, 최대 258줄) — `schedule.py` |
+| **코드** | `app/graph/subgraphs/itinerary/` (9모듈, 최대 264줄) — `schedule.py` |
 | **출력** | `Itinerary` (항목별 도착·출발·이동수단·선택 이유) |
 
 **스케줄링은 LLM이 아니라 결정론적 코드가 한다.** LLM에게 시각 계산을 맡기면
