@@ -273,7 +273,7 @@ final_score = 0.6 × relevance + 0.4 × personal_score
 
 | | |
 |---|---|
-| **코드** | `app/tools/maps.py` (387줄) · `app/tools/routing.py` (220줄) |
+| **코드** | `app/tools/maps.py` (402줄) · `app/tools/kakao_local.py` (130줄) · `app/tools/routing.py` (220줄) |
 | **화면** | `mobile/src/components/NaverMap.tsx` (580줄) |
 | **엔드포인트** | `POST /threads/{id}/routes` · `POST /reroute` |
 
@@ -328,7 +328,7 @@ ctx_weather → risky_hours 산출 → assemble_constraints 가 실내 우선 �
 | | |
 |---|---|
 | **코드** | `detect_gaps` → `dispatch_nearby` ⟨Send⟩ → `nearby_search` → `rerank_nearby` → `fill_gaps` |
-| **외부** | 네이버 지역검색 |
+| **외부** | **카카오 Local**(1순위, 좌표+반경 네이티브) → 네이버 지역검색(폴백) |
 
 **빈틈 탐지 기준** — 유휴 40분 이상, 종료 후 잔여 60분 이상, 그리고 **첫 일정 앞**.
 
@@ -599,7 +599,7 @@ app/
 │       └── archive.py       200  UR-10  facet 검색 + 리랭크
 ├── tools/
 │   ├── culture_api.py       500  UR-03  KCISA + 공공데이터포털
-│   ├── maps.py              387  UR-06  지오코딩 · 이동행렬 · 주변검색
+│   ├── maps.py              402  UR-06  지오코딩 · 이동행렬 · 주변검색
 │   ├── weather.py           332  UR-07  기상청
 │   ├── http.py              244  이벤트 루프 인지 HTTP 클라이언트
 │   ├── verify.py            235  UR-04
@@ -607,6 +607,7 @@ app/
 │   ├── local_catalog.py     199  카탈로그 조회 + 장소 연결
 │   ├── websearch.py         141  Tavily → Exa
 │   ├── region.py            134  UR-18  시·도 · 시군구 판정
+│   ├── kakao_local.py       130  UR-08  좌표 기준 반경 검색 (1순위)
 │   └── base.py               61  예산 인지 safe_call · TTL 캐시
 ├── memory/
 │   ├── curation.py          324  즐겨찾기 · 자동 큐레이션
@@ -767,8 +768,9 @@ COST_LEG_MEASURE  = 0.4    COST_COMPOSE = 2.5   # 이건 포기할 수 없다
 ```
 pytest    193 passed, 1 skipped   (수집 194개)
 ruff      All checks passed!
-외부 API   10/10 (naver_geocode · naver_directions · weather · culture_api ·
-                 culture_facility · naver_local_search · websearch · ors · odsay · llm)
+외부 API   11/11 (naver_geocode · naver_directions · weather · culture_api ·
+                 culture_facility · kakao_local · naver_local_search · websearch ·
+                 ors · odsay · llm)
 DB        places 2,092 · visits 32 · embeddings 32 · users 1
 ```
 

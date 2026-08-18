@@ -565,6 +565,7 @@ DB가 죽었다고 이미 만든 일정을 사용자에게 못 보여줄 이유�
 |---|---|---|---|
 | 지오코딩(주소) | NCP Geocoding | `tools/maps.py` `geocode()` | 1순위. `addressElements` 로 시·도까지 받는다(UR-18) |
 | 지오코딩(POI) | NAVER 지역검색 | `tools/maps.py` `place_lookup()` | 주소로 안 잡히면 |
+| 주변 장소(반경) | **카카오 Local** | `tools/kakao_local.py` | 1순위. 실패·0건이면 NAVER 지역검색으로 |
 | 자동차 경로 | NAVER Directions 5/15 | `tools/maps.py` | **자동차 전용** |
 | 도보 경로 | OpenRouteService | `tools/routing.py` | `foot-walking`, Matrix 로 N×N 1콜 |
 | 대중교통 | ODsay LAB | `tools/routing.py` | `SearchPathType` 1=지하철 2=버스 |

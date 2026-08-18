@@ -77,6 +77,9 @@ class Settings(BaseSettings):
     # 둘 다 선택 — 없으면 거리 기반 추정으로 내려간다.
     ors_api_key: str | None = None        # OpenRouteService (도보) 무료 2,500건/일
     odsay_api_key: str | None = None      # ODsay LAB (대중교통) 무료 1,000건/일
+    # 카카오 Local — 좌표 기준 반경 검색(주변 카페·식당·문화시설). 무료 100,000건/일.
+    # 없으면 NAVER 지역검색으로 내려간다(반경 파라미터가 없어 정확도가 떨어진다).
+    kakao_rest_api_key: str | None = None
     tavily_api_key: str | None = None
     exa_api_key: str | None = None
 

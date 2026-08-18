@@ -136,18 +136,17 @@ async def schedule(state: ItineraryState) -> dict:
             hungry = [x for x in free if _quota_unmet(quota, placed, x.kind)]
             if hungry:
                 free = hungry
-            elif _quota_missing(quota, placed):
-                # 못 채운 몫이 남았는데 후보가 하나도 없다 — 카페처럼 탐색이 아니라
-                # 주변 검색에서 오는 종류다. 그 몫만큼 **자리를 남긴다.** 안 그러면
-                # 점수 높은 문화·상점이 남은 칸을 다 가져가고 "디저트 3개"가 통째로
-                # 사라진다(빈틈 채우기가 채울 자리도 없다).
-                #
-                # 다만 **남기는 것과 멈추는 것은 다르다.** 예전에는 여기서 그냥
-                # break 해서, 카페 후보가 없으면 첫 반복에 탈출해 문화까지 한 곳도
-                # 못 넣고 일정이 0곳으로 나왔다("문화생활 + 디저트 2개" — 2026-08-18).
-                # 남은 칸이 그 몫보다 많을 때만 다른 종류로 계속 채운다.
-                if max_stops - len(items) - _quota_missing(quota, placed) <= 0:
-                    break
+            # 못 채운 몫이 남았는데 그 종류의 후보가 하나도 없다 — 카페처럼
+            # 탐색이 아니라 주변 검색에서 오는 종류다. 그 몫만큼 **자리를 남긴다.**
+            # 안 그러면 점수 높은 문화·상점이 남은 칸을 다 가져가고 "디저트 3개"가
+            # 통째로 사라진다(빈틈 채우기가 채울 자리도 없다).
+            #
+            # 다만 **남기는 것과 멈추는 것은 다르다.** 예전에는 몫이 남아 있기만
+            # 하면 break 해서, 카페 후보가 없으면 첫 반복에 탈출해 문화까지 한 곳도
+            # 못 넣고 일정이 0곳으로 나왔다("문화생활 + 디저트 2개" — 2026-08-18).
+            # **남길 자리조차 없을 때만** 멈춘다.
+            elif (missing := _quota_missing(quota, placed)) and                     max_stops - len(items) - missing <= 0:
+                break
         pool = [x for x in free if x.kind in want] if want else free
         if want and not pool:
             pool = free                 # 식당 후보가 없으면 자리를 비우기보다 채운다

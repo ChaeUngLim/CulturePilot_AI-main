@@ -302,11 +302,26 @@ async def _travel_matrix(points: list[GeoPoint], mode: Mode,
 # --------------------------------------------------------------- 지역검색
 async def search_nearby(anchor: GeoPoint, kind: str, radius_m: int = 800,
                         limit: int = 10) -> list[dict]:
-    """주변 장소 검색 (NAVER Developers 지역검색).
+    """주변 장소 검색. **카카오 Local 우선, NAVER 지역검색 폴백.**
 
-    지역검색 API는 반경 파라미터가 없다. 좌표 기반 정렬만 지원하므로
-    받아온 결과를 여기서 반경으로 잘라낸다.
+    카카오는 `x`·`y`·`radius` 를 서버가 받고 `distance` 를 함께 준다 — 호출 한 번으로
+    끝나고 반경이 정확하다. NAVER 지역검색에는 반경 파라미터가 없어서, 아래 폴백은
+    좌표를 주소로 되돌린 뒤 키워드로 찾고 결과를 코드에서 거리로 잘라낸다.
+    그래서 동(洞) 경계 밖의 가까운 가게가 목록에 아예 없을 수 있다.
+
+    **둘을 합치지 않고 순차로 간다.** 같은 가게를 두 제공자가 다르게 표기해
+    («스타벅스 서초점» / «스타벅스 서초») `merge_candidates` 의 이름 키가 갈리면
+    같은 곳이 일정에 두 번 들어간다. 웹검색(Tavily → Exa)과 같은 방식이다.
     """
+    from app.tools import kakao_local
+
+    if kakao_local.enabled():
+        rows = await kakao_local.search_nearby(anchor, kind, radius_m, limit)
+        if rows:
+            return rows
+        # 0건이면 폴백으로 내려간다 — 반경이 좁아 비었을 수 있고,
+        # 그때 NAVER 의 넓은 키워드 검색이 받아 주면 빈틈이 덜 남는다.
+
     s = get_settings()
     if not (s.naver_search_client_id and s.naver_search_client_secret):
         return []

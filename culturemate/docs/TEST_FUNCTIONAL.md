@@ -7,7 +7,7 @@
 >
 > | 문서 | 무엇을 봤나 |
 > |---|---|
-> | **TEST_FUNCTIONAL.md** (이 문서) | 자동 테스트 · 외부 API 10종 · 조건 해석 · HITL 중단/재개 · 웹 화면 |
+> | **TEST_FUNCTIONAL.md** (이 문서) | 자동 테스트 · 외부 API 11종 · 조건 해석 · HITL 중단/재개 · 웹 화면 |
 > | [TEST.md](TEST.md) | **지역을 바꿔 가며** 같은 요청을 넣었을 때 그 지역 장소가 나오는가 |
 >
 > 이 문서가 한동안 `TEST - 복사본.md` 라는 이름으로 있었다(2026-08-16 정정).
@@ -60,7 +60,7 @@ $ pytest -q
 
 ---
 
-## 3. 외부 API 연동 (10/10)
+## 3. 외부 API 연동 (11/11)
 
 `GET /diagnostics?probe=true` — 각 API를 실제로 한 번씩 호출한 결과.
 
@@ -68,7 +68,8 @@ $ pytest -q
 |---|---|:--:|
 | `naver_geocode` | 주소 → 좌표 | ✅ |
 | `naver_directions` | 자동차 경로 | ✅ |
-| `naver_local_search` | 주변 장소 | ✅ |
+| `kakao_local` | 주변 장소 반경 검색(1순위) | ✅ |
+| `naver_local_search` | 주변 장소 — 카카오 실패 시 폴백 | ✅ (`served_by=kakao`) |
 | `weather` | 기상청 단기예보 | ✅ |
 | `culture_api` | KCISA 기간형 행사 | ✅ |
 | `culture_facility` | 공공데이터포털 문화시설 | ✅ |

@@ -80,7 +80,7 @@ graph LR
         DB[("<b>PostgreSQL 18 + pgvector</b><br/>아카이브 · 확정 일정 · 장소<br/>벡터 인덱스 · 체크포인트")]
     end
 
-    EXT["외부 API 10종<br/>문화 · 지도/경로 · 날씨 · 웹검색 · AI 모델"]
+    EXT["외부 API 11종<br/>문화 · 지도/경로 · 장소검색 · 날씨 · 웹검색 · AI 모델"]
 
     APP -->|HTTPS · SSE| API
     API --> G

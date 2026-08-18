@@ -15,7 +15,6 @@ import re
 from datetime import date, timedelta
 
 from app.graph.router.detect import (
-    _mentioned_kind_groups,
     _NOT_LANDMARK,
     _detect_count,
     _detect_kind_quota,
@@ -23,6 +22,7 @@ from app.graph.router.detect import (
     _detect_radius,
     _detect_regions,
     _detect_stops,
+    _mentioned_kind_groups,
 )
 from app.graph.router.endpoints import _split_endpoints
 from app.graph.router.timeparse import _UNTIL_TIME, _detect_dwell, _fix_am_pm, _to_time

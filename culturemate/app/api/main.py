@@ -742,6 +742,7 @@ async def diagnostics(probe: bool = False):
         },
         "naver_maps": bool(s.naver_client_id and s.naver_client_secret),
         "naver_local_search": bool(s.naver_search_client_id and s.naver_search_client_secret),
+        "kakao_local": bool(s.kakao_rest_api_key),
         "culture_api": bool(s.culture_key),
         "weather": {"key": bool(s.weather_key), "source": s.weather_source},
         "websearch": bool(s.tavily_api_key or s.exa_api_key),
@@ -827,10 +828,23 @@ async def diagnostics(probe: bool = False):
                        if last_error(f"culture.facility.{op}")), None),
     }
 
+    # 카카오를 직접 재 둔다. search_nearby 는 카카오 → NAVER 순으로 내려가므로,
+    # 합쳐서 재면 «주변 검색은 된다»만 보이고 어느 쪽이 답했는지가 사라진다.
+    from app.tools import kakao_local
+    kakao_rows = await kakao_local.search_nearby(seoul, "cafe", 1000, 3)         if kakao_local.enabled() else []
+    probes["kakao_local"] = {
+        "ok": bool(kakao_rows), "count": len(kakao_rows),
+        "sample": [n["name"] for n in kakao_rows[:3]],
+        "error": last_error("kakao.category") or last_error("kakao.keyword") or (
+            None if kakao_local.enabled() else "KAKAO_REST_API_KEY 미설정"),
+    }
+
     nearby = await maps.search_nearby(seoul, "cafe", radius_m=1000, limit=3)
     probes["naver_local_search"] = {
         "ok": bool(nearby), "count": len(nearby),
         "sample": [n["name"] for n in nearby[:3]],
+        # 카카오가 답했으면 이 값은 폴백이 아니라 그 결과다. 어느 쪽인지 밝힌다.
+        "served_by": "kakao" if kakao_rows else ("naver" if nearby else None),
         "error": last_error("naver.local") or (
             None if s.naver_search_client_id else "NAVER_SEARCH_CLIENT_ID/SECRET 미설정"),
     }

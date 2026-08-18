@@ -1,6 +1,6 @@
 # 실행 준비 — 키 발급과 연결
 
-빈 환경에서 앱이 실제로 돌 때까지의 순서입니다. **키 10종**을 받아 `.env` 두 개를
+빈 환경에서 앱이 실제로 돌 때까지의 순서입니다. **키 11종**을 받아 `.env` 두 개를
 채우면 됩니다. 전부 무료 티어로 가능하고, 40~60분 걸립니다.
 
 > 기능이 어느 키에 걸려 있는지는 [FUNCTIONAL_MAP.md](FUNCTIONAL_MAP.md),
@@ -29,10 +29,26 @@
 | 4 | `CULTURE_API_KEY` | KCISA 기간형 행사 | 웹검색으로 대체 | ✅ |
 | 5 | `KMA_API_HUB_KEY` | 기상청 단기예보 | 날씨 보정 없음 | ✅ |
 | 6 | `NAVER_CLIENT_ID/SECRET` | 좌표·자동차 경로 | 좌표 없으면 후보가 안 됨 | ✅ |
-| 7 | `NAVER_SEARCH_CLIENT_ID/SECRET` | 주변 장소 검색 | 상시공간·식당 추천 불가 | ✅ |
-| 8 | `ORS_API_KEY` | 도보·자전거 경로 | 거리 기반 추정 | 권장 |
-| 9 | `ODSAY_API_KEY` | 지하철·버스 경로 + 노선 선형 | 거리 기반 추정 | 권장 |
-| 10 | `TAVILY_API_KEY` / `EXA_API_KEY` | 공식정보 검증 | 전부 '확인 필요' 표시 | 권장 |
+| 7 | `KAKAO_REST_API_KEY` | 주변 장소 **반경** 검색 (1순위) | ⑧로 폴백 — 동 단위라 경계 밖을 놓친다 | 권장 |
+| 8 | `NAVER_SEARCH_CLIENT_ID/SECRET` | 주변 장소 검색 (⑦ 실패 시) | 상시공간·식당 추천 불가 | ✅ |
+| 9 | `ORS_API_KEY` | 도보·자전거 경로 | 거리 기반 추정 | 권장 |
+| 10 | `ODSAY_API_KEY` | 지하철·버스 경로 + 노선 선형 | 거리 기반 추정 | 권장 |
+| 11 | `TAVILY_API_KEY` / `EXA_API_KEY` | 공식정보 검증 | 전부 '확인 필요' 표시 | 권장 |
+| 12 | `TOUR_API_KEY` | 한국관광공사 TourAPI 4.0 | — (아직 배선 전) | 선택 |
+| 13 | `MARKET_API_KEY` | 소상공인 상권정보 | — (아직 배선 전) | 선택 |
+
+**키가 아닌데 반드시 있어야 하는 값 넷.** 비면 해당 기능이 조용히 꺼집니다.
+
+| 값 | 무엇 | 비면 |
+|---|---|---|
+| `CULTURE_API_ENDPOINT` | KCISA 행사 API 요청 주소 | **키가 있어도** 행사가 웹검색 폴백으로 떨어진다 |
+| `CULTURE_FACILITY_ENDPOINT` | 문화시설 Base URL | 시설 조회가 통째로 빈다 |
+| `EMBED_DIM` | 임베딩 차원 (**1024 고정**) | 스키마 `vector(1024)` 와 어긋나면 삽입 실패 |
+| `PG_DSN` | PostgreSQL 접속 문자열 | 저장·조회 전부 실패 |
+
+> ⚠️ **`.env` 는 `culturemate/.env` 에 둡니다.** `백엔드실행.bat` 이 `--env-file .env` 를
+> **자기 폴더 기준**으로 찾습니다. 저장소 루트에 두면 **키가 하나도 안 들어간 채** 컨테이너가
+> 뜨고, 진단은 전부 «키 없음»으로 나옵니다. (2026-08-18 에 실제로 밟은 함정입니다.)
 
 ---
 
@@ -49,9 +65,25 @@
 ```ini
 LLM_BACKEND=nim
 NVIDIA_API_KEY=nvapi-여기에-붙여넣으세요
-MODEL_EMBED=                                   # 비움 → NIM 기본 1024차원
+
+# 임베딩 — 이 모델은 기본 출력이 2048차원이라 dimensions=1024 를 넘겨야 한다.
+# 그 처리는 provider.EMBED_DIM_CONFIGURABLE 이 모델별로 갈라서 한다.
+MODEL_EMBED=nvidia/llama-nemotron-embed-1b-v2
+EMBED_DIM=1024
 MODEL_RERANK=nvidia/llama-nemotron-rerank-1b-v2
 ```
+
+> ⚠️ **임베딩 차원은 1024 로 고정합니다. 2048 은 선택지가 아닙니다.**
+> pgvector 의 HNSW 인덱스가 **2000차원 상한**이라, 2048 로 올리면 `idx_exp_embedding` 을
+> 만들 수 없고 아카이브 검색이 순차 스캔으로 떨어집니다
+> (실제 오류: `column cannot have more than 2000 dimensions for hnsw index`, pgvector 0.8.5).
+> 기록이 쌓일수록 좋아진다는 이 서비스의 전제와 정면으로 충돌합니다.
+>
+> ⚠️ **임베딩 모델을 바꾸면 기존 벡터를 전량 재생성해야 합니다.** 벡터 공간이 달라져
+> 옛 값과 새 값이 섞이면 검색 순위가 무너집니다.
+>
+> ⚠️ 고정 차원 모델(`nv-embedqa-e5-v5`)에 `dimensions` 를 넘기면 400 이 납니다.
+> 새 모델을 쓸 때는 `provider.EMBED_DIM_CONFIGURABLE` 에 먼저 등록하세요.
 
 > ⚠️ **리랭커 모델명은 카탈로그에 있어도 살아 있다는 뜻이 아닙니다.**
 > `nv-rerankqa-mistral-4b-v3` → 404, `llama-3.2-nv-rerankqa-1b-v2` → EOL(410).
@@ -90,14 +122,25 @@ DATA_GO_KR_KEY=발급받은_Decoding_키
 CULTURE_FACILITY_ENDPOINT=https://apis.data.go.kr/B553457/nopenapi/rest/cultureartspaces
 ```
 
-### ④  — 기간형 행사 (필수)
+### ④ KCISA 문화공공데이터광장 — 기간형 행사 (필수)
 
-[culture.go.kr](https://www.culture.go.kr) → 문화체육관광부_문화예술공연(통합) 신청.
+[culture.go.kr](https://www.culture.go.kr) → 로그인 → 오픈API → **활용신청**.
 **포털 키와 다른 키입니다** — 섞으면 403(code 30)이 납니다.
 
 ```ini
 CULTURE_API_KEY=KCISA_서비스키
+CULTURE_API_ENDPOINT=https://api.kcisa.kr/openapi/CNV_060/request
 ```
+
+> ⚠️ **키만 넣고 주소를 비우면 행사가 통째로 웹검색 폴백으로 떨어집니다.**
+> 진단에서 `culture_api` 가 `from_api: 0 · from_fallback: N` 으로 나오면 이 경우입니다.
+>
+> ⚠️ **KCISA 는 API 단위로 활용신청합니다.** 계정 키 하나로 전부 열리지 않습니다 —
+> 신청한 API 는 200, 신청하지 않은 API 는 **401 Unauthorized** 가 옵니다.
+>
+> 주소를 모르면 `docker exec culturemate python scripts/find_culture_api.py` 로 훑습니다.
+> 다만 이 스크립트의 후보 목록에 **접두사 없는 `CNV_060` 이 빠져 있어**(2026-08-18 확인)
+> 못 찾을 수 있습니다. 그때는 발급처 마이페이지의 «활용신청 상세» 요청 URL 을 그대로 넣으세요.
 
 ### ⑤ 기상청 API허브 (필수)
 
@@ -129,9 +172,30 @@ EXPO_PUBLIC_NAVER_MAP_KEY_PARAM=ncpKeyId
 
 > Secret을 `mobile\.env` 에 넣지 마세요. `EXPO_PUBLIC_*` 은 앱 번들에 그대로 박힙니다.
 
-### ⑦ NAVER 검색 API — 주변 장소 (필수)
+### ⑦ 카카오 Local — 주변 장소 반경 검색 (권장)
 
-**⑥과 다른 사이트, 다른 자격증명입니다.**
+주변 카페·식당·문화공간을 **좌표 기준 반경**으로 찾습니다.
+NAVER 지역검색에는 반경 파라미터가 없어 좌표 → 주소 → 동(洞) 키워드로 우회했고,
+그래서 앵커가 동 경계에 있으면 **200m 옆 가게가 목록에 아예 없었습니다.**
+없으면 NAVER 로 내려가므로 기능은 돌지만 정확도가 떨어집니다.
+
+1. [developers.kakao.com/console/app](https://developers.kakao.com/console/app) → 애플리케이션 추가
+2. **[카카오맵] > [사용 설정] ON** ← 2024-12-01 이후 필수
+3. [앱 키] → **REST API 키** 복사 (JavaScript/Admin 키 아님)
+
+```ini
+KAKAO_REST_API_KEY=
+```
+
+> 무료 100,000건/일 · 월 300만건. Bizwallet 을 연결하지 않으면 초과 시 과금이 아니라
+> **호출이 막힙니다** — 의도치 않은 청구가 생기지 않습니다.
+>
+> ⚠️ 무료 쿼터는 개발자 계정의 **«첫 번째로 활성화한 앱»에만** 주어집니다.
+
+### ⑧ NAVER 검색 API — 주변 장소 폴백 (필수)
+
+**⑥과 다른 사이트, 다른 자격증명입니다.** ⑦(카카오)이 1순위이고 여기는 폴백이지만,
+카카오 키가 막히면 주변 검색이 통째로 비므로 **둘 다 받아 둡니다.**
 
 1. [developers.naver.com/apps/#/register](https://developers.naver.com/apps/#/register)
 2. 사용 API에서 **[검색]** 선택 → WEB 설정 → `http://localhost`
@@ -141,7 +205,7 @@ NAVER_SEARCH_CLIENT_ID=
 NAVER_SEARCH_CLIENT_SECRET=
 ```
 
-### ⑧ OpenRouteService — 도보·자전거 (권장)
+### ⑨ OpenRouteService — 도보·자전거 (권장)
 
 [openrouteservice.org/dev](https://openrouteservice.org/dev) 가입 → API key.
 무료 티어 한도는 [REQUIREMENTS.md §5](REQUIREMENTS.md) 인벤토리 표에 한 곳으로 모아 두었다
@@ -151,7 +215,7 @@ NAVER_SEARCH_CLIENT_SECRET=
 ORS_API_KEY=
 ```
 
-### ⑨ ODsay — 지하철·버스 (권장)
+### ⑩ ODsay — 지하철·버스 (권장)
 
 [lab.odsay.com](https://lab.odsay.com) 가입 → API 신청.
 **노선 선형(`loadLane`)까지 제공**하므로 지도에 실제 지하철 노선이 그려집니다.
@@ -160,7 +224,7 @@ ORS_API_KEY=
 ODSAY_API_KEY=
 ```
 
-### ⑩ Tavily / Exa — 공식정보 검증 (권장)
+### ⑪ Tavily / Exa — 공식정보 검증 (권장)
 
 - [app.tavily.com](https://app.tavily.com) — 무료 1,000회/월 (`tvly-` 로 시작)
 - [exa.ai](https://exa.ai) — 폴백. 초당 10회 제한이 있어 연속 호출 시 429가 납니다
@@ -169,6 +233,41 @@ ODSAY_API_KEY=
 TAVILY_API_KEY=tvly-...
 EXA_API_KEY=
 ```
+
+### ⑫ 한국관광공사 TourAPI 4.0 · 소상공인 상권정보 (선택 · 아직 배선 전)
+
+둘 다 **공공데이터포털**에서 발급합니다. `DATA_GO_KR_KEY` 와 같은 인증키를 쓸 수 있지만
+**활용신청은 서비스마다 따로** 해야 합니다 — 신청하지 않은 서비스는 같은 키로도
+`code 30`(SERVICE_KEY_IS_NOT_REGISTERED_ERROR)이 돌아옵니다.
+
+```ini
+# 관광지·문화시설·축제 — data.go.kr 에서 "한국관광공사_국문 관광정보 서비스" 활용신청
+TOUR_API_KEY=
+TOUR_API_BASE_URL=https://apis.data.go.kr/B551011/KorService2
+
+# 반경 내 상가업소·주요상권 — "소상공인시장진흥공단_상가(상권)정보" 활용신청
+MARKET_API_KEY=
+MARKET_API_BASE_URL=https://apis.data.go.kr/B553077/api/open/sdsc2
+```
+
+> ❗ **이 두 값은 지금 아무 코드도 읽지 않습니다.** `app/` 에 참조가 0건이라
+> 채워 넣어도 동작이 달라지지 않고 `/diagnostics` 에도 나타나지 않습니다.
+> 배선하려면 `tools/tour_api.py` 신설 + discovery·maps 연결 + 진단 프로브가 필요합니다.
+>
+> ⚠️ TourAPI 4.0 은 오퍼레이션 접미사가 `1 → 2` 로 바뀌었습니다
+> (`areaBasedList2` · `searchKeyword2` · `locationBasedList2`). 예전 주소를 쓰면 빈 응답이 옵니다.
+
+### ⑬ PostgreSQL 접속 (필수)
+
+컨테이너 하나에 PostgreSQL 과 API 가 함께 들어 있어 로컬 소켓으로 붙습니다.
+배치 파일이 사용자·비밀번호·DB 이름을 `-e` 로 넘기므로, 값을 바꿀 일은 거의 없습니다.
+
+```ini
+PG_DSN=
+```
+
+> 시드 데이터는 named volume(`culturemate_pgdata`)에 있어 **컨테이너를 지워도 남습니다.**
+> `docker compose down -v` 와 `docker volume rm` 만 조심하면 됩니다.
 
 ---
 
@@ -226,12 +325,23 @@ EXPO_PUBLIC_USER_ID=00000000-0000-0000-0000-000000000001
 curl "http://localhost:8000/diagnostics?probe=true"
 ```
 
-각 API를 실제로 한 번씩 호출합니다. 10개 전부 `ok: true` 면 정상입니다.
+각 API를 실제로 한 번씩 호출합니다. **프로브 11종**이 전부 `ok: true` 면 정상입니다.
 
 ```
 naver_geocode · naver_directions · weather · culture_api · culture_facility
-naver_local_search · websearch · ors · odsay · llm
+kakao_local · naver_local_search · websearch · ors · odsay · llm
 ```
+
+> `naver_local_search` 의 `served_by` 를 함께 봅니다 — `kakao` 면 카카오가 답한 것이고,
+> `naver` 면 카카오가 실패했거나 키가 없어 폴백으로 내려간 것입니다.
+
+> `TOUR_API_KEY` · `MARKET_API_KEY` 는 배선 전이라 여기 나타나지 않습니다(§2 ⑪).
+>
+> **`culture_api` 는 `ok: true` 여도 한 번 더 봅니다.** `from_api` 가 0 이고
+> `from_fallback` 이 N 이면 키·주소가 아니라 **웹검색이 대신 답한 것**입니다 —
+> `CULTURE_API_ENDPOINT` 를 확인하세요(§2 ④).
+>
+> **`.env` 를 고쳤으면 컨테이너를 재생성해야 합니다.** `docker restart` 로는 반영되지 않습니다.
 
 시드 데이터(장소 2,092곳 · 방문 기록 32건)를 넣으면 개인화가 동작합니다:
 

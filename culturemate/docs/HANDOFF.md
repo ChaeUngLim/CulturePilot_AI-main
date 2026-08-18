@@ -10,7 +10,7 @@
 
 ## 1. 30초 요약
 
-**전 구간이 실제 데이터로 동작한다.** 외부 API 10종 연결, 컨테이너 1개로 기동,
+**전 구간이 실제 데이터로 동작한다.** 외부 API **11종** 연결, 컨테이너 1개로 기동,
 일정 생성 → 지도 경로 → HITL 확인 카드 → 재계획까지 앱에서 완주한다.
 **기획안이 약속한 핵심 기능 중 미구현으로 남은 것은 없다.**
 
@@ -29,7 +29,7 @@ DB        places 2,092 · visits 32 · embeddings 32 · plan_edits 13
 
 ### 2.1 필요한 것
 
-- Docker Desktop · Node.js(앱 실행용) · 키 10종 → [SETUP.md](SETUP.md)
+- Docker Desktop · Node.js(앱 실행용) · 키 11종 → [SETUP.md](SETUP.md)
 - **`.env` 는 저장소에 없다.** 위치는 `culturemate/.env` — `백엔드실행.bat` 이
   `--env-file .env` 를 자기 폴더 기준으로 찾는다. **루트에 두면 키가 하나도 안 들어간다.**
   (`.env.example` 은 이 저장소에 없다. SETUP.md §2 를 보고 직접 만든다.)
@@ -58,7 +58,7 @@ npm start -- --web --port 19006
 curl "http://localhost:8000/diagnostics?probe=true"
 ```
 
-10개 전부 `ok: true` 면 정상이다. 시드가 없으면 개인화가 비므로:
+**프로브 11종**이 전부 `ok: true` 면 정상이다. 시드가 없으면 개인화가 비므로:
 
 ```bat
 docker exec culturemate python scripts/seed_demo.py
