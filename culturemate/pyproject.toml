@@ -1,0 +1,23 @@
+[project]
+name = "culturemate"
+version = "0.1.0"
+description = "아카이브 기반 문화생활 개인화 멀티에이전트 (LangChain + LangGraph)"
+requires-python = ">=3.11"      # LangGraph의 async interrupt는 3.11+ 컨텍스트 전파에 의존
+dynamic = ["dependencies"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF007"]
+ignore = ["E501", "B008", "UP042", "UP017"]
+# UP042/UP017: StrEnum·datetime.UTC는 3.11+ 전용 문법.
+# 런타임 타깃은 3.11+지만 로컬 개발/CI 이미지 폭을 넓히려 3.10 호환 표현을 유지한다.

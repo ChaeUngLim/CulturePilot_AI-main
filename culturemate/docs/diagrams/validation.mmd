@@ -1,0 +1,31 @@
+---
+config:
+  flowchart:
+    curve: linear
+---
+graph TD;
+	__start__([<p>__start__</p>]):::first
+	check_hours(check_hours)
+	check_travel(check_travel)
+	check_overlap(check_overlap)
+	check_weather(check_weather)
+	check_revisit(check_revisit)
+	triage(triage)
+	build_confirm_cards(build_confirm_cards)
+	__end__([<p>__end__</p>]):::last
+	__start__ --> check_hours;
+	__start__ --> check_overlap;
+	__start__ --> check_revisit;
+	__start__ --> check_travel;
+	__start__ --> check_weather;
+	check_hours --> triage;
+	check_overlap --> triage;
+	check_revisit --> triage;
+	check_travel --> triage;
+	check_weather --> triage;
+	triage --> build_confirm_cards;
+	build_confirm_cards --> __end__;
+	classDef default fill:#f2f0ff,line-height:1.2
+	classDef first fill-opacity:0
+	classDef last fill:#bfb6fc
+

@@ -1,0 +1,37 @@
+---
+config:
+  flowchart:
+    curve: linear
+---
+graph TD;
+	__start__([<p>__start__</p>]):::first
+	ctx_geo(ctx_geo)
+	ctx_hours(ctx_hours)
+	ctx_weather(ctx_weather)
+	ctx_preference(ctx_preference)
+	assemble_constraints(assemble_constraints)
+	schedule(schedule)
+	detect_gaps(detect_gaps)
+	nearby_search(nearby_search)
+	rerank_nearby(rerank_nearby)
+	fill_gaps(fill_gaps)
+	__end__([<p>__end__</p>]):::last
+	__start__ --> ctx_geo;
+	__start__ --> ctx_hours;
+	__start__ --> ctx_preference;
+	__start__ --> ctx_weather;
+	assemble_constraints --> schedule;
+	ctx_geo --> assemble_constraints;
+	ctx_hours --> assemble_constraints;
+	ctx_preference --> assemble_constraints;
+	ctx_weather --> assemble_constraints;
+	detect_gaps -.-> fill_gaps;
+	detect_gaps -.-> nearby_search;
+	nearby_search --> rerank_nearby;
+	rerank_nearby --> fill_gaps;
+	schedule --> detect_gaps;
+	fill_gaps --> __end__;
+	classDef default fill:#f2f0ff,line-height:1.2
+	classDef first fill-opacity:0
+	classDef last fill:#bfb6fc
+

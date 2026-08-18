@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1460 900" width="1460" height="900" font-family="Malgun Gothic, Apple SD Gothic Neo, Noto Sans KR, sans-serif">
+  <defs>
+    <marker id="ar-red" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <path d="M0,0 L10,4 L0,8 Z" fill="#f0546b"/>
+    </marker>
+    <marker id="ar-green" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <path d="M0,0 L10,4 L0,8 Z" fill="#35c88a"/>
+    </marker>
+  </defs>
+
+  <rect width="1460" height="900" fill="#0b1020"/>
+
+  <!-- 제목 -->
+  <text x="730" y="62" text-anchor="middle" fill="#ffffff" font-size="34" font-weight="700">병렬 실행 시 키 충돌이 나는 이유 (InvalidUpdateError)</text>
+  <text x="730" y="102" text-anchor="middle" fill="#9aa4bf" font-size="19">서브그래프가 «입력으로 받은 키»까지 그대로 되돌려주기 때문에, 합칠 규칙(리듀서)이 없는 키가 양쪽에서 반환돼 실행이 멈춘다</text>
+
+  <!-- 병렬 실행 세로선 -->
+  <line x1="70" y1="248" x2="70" y2="592" stroke="#38bdf8" stroke-width="2.5" stroke-dasharray="7 6"/>
+  <line x1="70" y1="248" x2="150" y2="248" stroke="#38bdf8" stroke-width="2.5" stroke-dasharray="7 6"/>
+  <line x1="70" y1="592" x2="150" y2="592" stroke="#38bdf8" stroke-width="2.5" stroke-dasharray="7 6"/>
+  <rect x="14" y="398" width="118" height="44" rx="22" fill="#0e2a3d" stroke="#38bdf8" stroke-width="1.6"/>
+  <text x="73" y="427" text-anchor="middle" fill="#7dd3fc" font-size="17" font-weight="600">⚡ 병렬 실행</text>
+
+  <!-- Archive -->
+  <rect x="150" y="205" width="420" height="86" rx="12" fill="#1a1230" stroke="#a06bf5" stroke-width="2.2"/>
+  <text x="360" y="243" text-anchor="middle" fill="#ffffff" font-size="22" font-weight="700">[ Archive 에이전트 ]</text>
+  <text x="360" y="272" text-anchor="middle" fill="#b28cf7" font-size="16">개인화 서브그래프</text>
+
+  <!-- Discovery -->
+  <rect x="150" y="549" width="420" height="86" rx="12" fill="#0f2018" stroke="#35c88a" stroke-width="2.2"/>
+  <text x="360" y="587" text-anchor="middle" fill="#ffffff" font-size="22" font-weight="700">[ Discovery 에이전트 ]</text>
+  <text x="360" y="616" text-anchor="middle" fill="#5cd6a3" font-size="16">탐색 서브그래프</text>
+
+  <!-- 반환 경로 -->
+  <path d="M570 248 H820 V400" fill="none" stroke="#f0546b" stroke-width="2.4" stroke-dasharray="9 7"/>
+  <path d="M570 592 H820 V440" fill="none" stroke="#f0546b" stroke-width="2.4" stroke-dasharray="9 7"/>
+  <line x1="820" y1="420" x2="965" y2="420" stroke="#f0546b" stroke-width="2.6" stroke-dasharray="9 7" marker-end="url(#ar-red)"/>
+
+  <!-- 라벨 -->
+  <rect x="596" y="222" width="330" height="42" rx="21" fill="#2a1220" stroke="#f0546b" stroke-width="1.5"/>
+  <text x="761" y="249" text-anchor="middle" fill="#ff9aab" font-size="16">받은 <tspan font-family="Consolas, monospace" fill="#ffd0d8">user_id</tspan> 를 그대로 반환</text>
+
+  <rect x="596" y="576" width="330" height="42" rx="21" fill="#2a1220" stroke="#f0546b" stroke-width="1.5"/>
+  <text x="761" y="603" text-anchor="middle" fill="#ff9aab" font-size="16">받은 <tspan font-family="Consolas, monospace" fill="#ffd0d8">user_id</tspan> 를 그대로 반환</text>
+
+  <!-- State -->
+  <rect x="965" y="380" width="440" height="80" rx="12" fill="#0d1e33" stroke="#3f8fe0" stroke-width="2.2"/>
+  <text x="1185" y="415" text-anchor="middle" fill="#ffffff" font-size="21" font-weight="700">[ CultureMateState ]</text>
+  <text x="1185" y="443" text-anchor="middle" fill="#7fb6ef" font-size="15">단일 공통 상태 객체</text>
+
+  <!-- 충돌 -->
+  <rect x="965" y="510" width="440" height="132" rx="12" fill="#25101a" stroke="#f0546b" stroke-width="2.4"/>
+  <text x="1185" y="548" text-anchor="middle" fill="#ff6b83" font-size="21" font-weight="700">💥 실행 중단</text>
+  <text x="1185" y="580" text-anchor="middle" fill="#ffb3bf" font-size="17" font-family="Consolas, monospace">InvalidUpdateError</text>
+  <text x="1185" y="611" text-anchor="middle" fill="#e59aa8" font-size="15">리듀서 없는 키에 한 스텝, 두 값</text>
+  <text x="1185" y="633" text-anchor="middle" fill="#e59aa8" font-size="15">— 어느 값을 쓸지 정할 수 없다</text>
+  <line x1="1185" y1="460" x2="1185" y2="506" stroke="#f0546b" stroke-width="2.2" stroke-dasharray="6 5"/>
+
+  <!-- 해법 -->
+  <rect x="150" y="700" width="1255" height="146" rx="12" fill="#0f1a16" stroke="#35c88a" stroke-width="2"/>
+  <text x="182" y="736" fill="#5cd6a3" font-size="18" font-weight="700">막는 방법 — 출력 스키마(output_schema)</text>
+  <text x="182" y="770" fill="#cbd5e1" font-size="16">서브그래프마다 <tspan fill="#ffffff" font-weight="700">부모로 내보낼 키 목록</tspan>을 정해, 합칠 규칙이 없는 키는 <tspan fill="#ffffff" font-weight="700">한쪽만</tspan> 내보낸다.</text>
+  <text x="182" y="800" fill="#8fa0bd" font-size="15" font-family="Consolas, monospace">ArchiveOutput   archive_hits · edit_signals · taste_profile · evidence · trace</text>
+  <text x="182" y="826" fill="#8fa0bd" font-size="15" font-family="Consolas, monospace">DiscoveryOutput conditions · candidates · verifications · place_diffs · evidence · trace</text>
+  <line x1="1035" y1="700" x2="1035" y2="846" stroke="#1e3a2f" stroke-width="1.5"/>
+  <text x="1062" y="748" fill="#5cd6a3" font-size="15" font-weight="700">user_id 는 양쪽 다 안 내보낸다</text>
+  <text x="1062" y="778" fill="#8fa0bd" font-size="14">evidence · trace 는 겹치지만</text>
+  <text x="1062" y="800" fill="#8fa0bd" font-size="14">리듀서가 있어 안전하다</text>
+  <line x1="960" y1="773" x2="1028" y2="773" stroke="#35c88a" stroke-width="2" marker-end="url(#ar-green)" opacity="0"/>
+</svg>

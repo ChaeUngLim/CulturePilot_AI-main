@@ -1,0 +1,40 @@
+---
+config:
+  flowchart:
+    curve: linear
+---
+graph TD;
+	__start__([<p>__start__</p>]):::first
+	classify(classify)
+	archive(archive)
+	discovery(discovery)
+	itinerary(itinerary)
+	validation(validation)
+	current_plan(current_plan)
+	merge_context(merge_context)
+	hitl(hitl)
+	finalize(finalize)
+	persist(persist)
+	compose(compose)
+	__end__([<p>__end__</p>]):::last
+	__start__ --> classify;
+	archive --> merge_context;
+	classify -.-> archive;
+	classify -.-> current_plan;
+	classify -.-> discovery;
+	current_plan --> merge_context;
+	discovery --> merge_context;
+	finalize --> persist;
+	hitl -.-> finalize;
+	hitl -.-> itinerary;
+	itinerary --> validation;
+	merge_context -.-> compose;
+	merge_context -.-> itinerary;
+	persist --> compose;
+	validation -.-> finalize;
+	validation -.-> hitl;
+	compose --> __end__;
+	classDef default fill:#f2f0ff,line-height:1.2
+	classDef first fill-opacity:0
+	classDef last fill:#bfb6fc
+
