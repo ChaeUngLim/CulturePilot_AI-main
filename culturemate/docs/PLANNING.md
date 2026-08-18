@@ -316,8 +316,8 @@ Planning 의 제약값을 함께 갱신한다.
 | 2.4-② 저장 목록에서 일정 만들기 | **UR-30** | ⬜ | `user_collections` 는 있으나 «담은 것 → 일정 생성» 경로가 없다 |
 | 2.4-③ 3지 반응(기대돼요/가봤어요/관심 없어요) | UR-01 · **UR-31** | ✅ | `taste-cards.tsx` 가 «기대돼요/가봤어요/관심 없어요» 를 `verdict`+`experienced` 조합으로 보내고, `rebuild_profile()` 이 되읽는다 (2026-08-17) |
 | 2.5-① 하루 이동 요약 · 편의시설 | **UR-37** | ⬜ | 구간 데이터는 이미 있으므로 집계만 하면 된다 |
-| **2.6 캘린더로 일정 확인** | **UR-28** | ✅ | **`plans(user_id, plan_date, status, payload)` 와 `idx_plans_user_date` 가 이미 있고 `nodes.persist → repo.save_itinerary` 가 저장한다. 없는 것은 «읽는 엔드포인트»와 «화면» 둘뿐이다** |
-| 3.1 Router · Search · Validation · Planning | FR-01~FR-19 | ✅ | 본 저장소는 5-Agent 로 더 잘게 나눴다 — 대응은 아래 |
+| **2.6 캘린더로 일정 확인** | **UR-28** | ✅ | `plans(user_id, plan_date, status, payload)` 와 `idx_plans_user_date` 위에 `nodes.persist → repo.save_itinerary` 가 저장하고, `GET /plans/{user_id}` · `GET /plans/detail/{plan_id}` · `(tabs)/calendar.tsx` 가 읽는다 (2026-08-17). **새 테이블도 마이그레이션도 필요 없었다** — 빠져 있던 것은 «읽는 질의»와 «화면» 둘뿐이었다 |
+| 3.1 Router · Search · Validation · Planning | FR-01~FR-19 | ✅ | 본 저장소는 5-Agent 로 더 잘게 나눴다 — 대응은 아래. 설계 문서는 같은 구현을 **9종**으로 한 겹 더 쪼갠다([AGENT_ROLES.md §1.2](AGENT_ROLES.md)) |
 | 3.1 CASE 2 «Search·Validation 생략» | FR-03 | ✅ | `router.fan_out` 7종 라우트 · `PlanFlags` |
 | 3.2 개인화 RAG 4단계 | UR-10 · **UR-40** | ✅ | 1~3단계(후보 검색 · 개인 기록 대조 · 근거 문장)에 더해 **4단계 «경고 판정»을 `validation.check_friction` 이 맡는다** (2026-08-17) |
 | 3.2 파생 제약 자동 산출(도보 10분·환승 1회) | **UR-35** | ◐ | `avg_dwell_min` 배율만 반영. **도보·환승 상한은 상수**(`WALK_PREFERENCE_MIN`·`TRANSFER_PENALTY_MIN`)라 개인화되지 않는다 |
@@ -330,6 +330,10 @@ Planning 의 제약값을 함께 갱신한다.
 
 **Agent 이름 대응** — 기획안 4역할 : 구현 5-Agent
 
+> **여기서는 5-Agent 로 묶어 적는다.** 같은 구현을 «따로 실패할 수 있는가»로 다시 쪼개면
+> **9종**이 되고, 그 도출 근거와 대응표는 [AGENT_ROLES.md §1.2](AGENT_ROLES.md) 에 있다.
+> 두 문서는 **같은 코드를 다른 입도로 본 것**이지 서로 다른 설계가 아니다.
+
 | 기획안 | 구현 |
 |---|---|
 | Router | `graph/router/` (`classify` + `fan_out`) |
@@ -337,11 +341,11 @@ Planning 의 제약값을 함께 갱신한다.
 | Validation Agent | `tools/verify.py` + `subgraphs/validation.py` (6종 병렬 검증) |
 | Planning Agent | **Planner**(`subgraphs/itinerary/`) + **Map Agent**(`tools/{maps,routing}.py`) + **Food Agent**(`_meal_slot`·`fill_gaps`) |
 
-## 8. 기획안과 구현이 어긋나는 지점 — 다섯 가지 중 **셋은 닫혔다**
+## 8. 기획안과 구현이 어긋나는 지점 — 다섯 가지 중 **넷은 닫혔다**
 
 숨기면 심사에서 가장 먼저 드러난다. 순서는 **기획안의 핵심에 가까운 순**이다.
-1~3 은 2026-08-17 에 닫혔고, 무엇이 문제였는지는 남겨 둔다 — 같은 자리가 다시 벌어지는지
-보려면 «무엇이 없었나»가 함께 있어야 한다.
+1~4 는 2026-08-17 에 닫혔고, 무엇이 문제였는지는 남겨 둔다 — 같은 자리가 다시 벌어지는지
+보려면 «무엇이 없었나»가 함께 있어야 한다. **남은 것은 5 하나뿐이다.**
 
 1. ~~**선제적 알림이 생성되지 않는다 (UR-11 · UR-12).**~~ **→ ✅ UR-40 으로 복원**
    기획안 2.1-② 는 서비스의 얼굴에 가까운 화면인데, 그 화면을 만들 이슈(`past_friction`)를
