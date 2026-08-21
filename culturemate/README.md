@@ -15,7 +15,7 @@
 
 | | 일반 추천 서비스 | CultureMate |
 |---|---|---|
-| 아카이브 | 기록 보관 | 다음 일정의 **판단 근거** — 탐색보다 먼저 조회 |
+| 아카이브 | 기록 보관 | 다음 일정의 **판단 근거** — 탐색과 병렬로 선조회해 후보 점수·경고에 개입 |
 | 개인화 신호 | 별점·관심 카테고리 | + **삭제·교체·순서·체류시간 변경** 등 수정 행동 |
 | 재방문 | 신규 장소와 동일 취급 | 마지막 방문 이후 **달라진 점** 8개 필드 비교 |
 | 일정 변경 | AI가 자동 수정 | 근거·영향·선택지 제시 후 **사용자 확정** (`interrupt`) |
@@ -44,7 +44,7 @@ curl localhost:8000/health
 # 로컬 개발 (Python 3.11+ 필요)
 pip install -r requirements.txt
 export LLM_BACKEND=fake              # 외부 API 없이 그래프만 돌려보기
-pytest -q                            # 128 passed, 1 skipped
+pytest -q                            # 193 passed, 1 skipped (수집 194개)
 python scripts/render_graph.py main  # 그래프 → Mermaid
 uvicorn app.api.main:app --reload
 ```
@@ -59,12 +59,12 @@ uvicorn app.api.main:app --reload
 ```
 사용자 요청
    └─ classify ──────── 요청 유형 7종 → 실행 계획(PlanFlags)
-        ├─ archive      개인 아카이브 3-facet 병렬 검색 → RRF → 경고 카드
-        ├─ discovery    행사·상시공간·웹 병렬 탐색 → 공식정보 검증
+        ├─ archive      개인 아카이브 3-facet 병렬 검색 → RRF → 관련 기록 선별
+        ├─ discovery    카탈로그·행사·상시공간·웹 병렬 탐색 → 공식정보 검증
         └─ current_plan 기존 일정 로드
              └─ merge_context
                   └─ itinerary   지도·날씨·운영시간 병렬 분석 → 결정론적 편성 → 공백 채우기
-                       └─ validation   5종 병렬 검증 → 자동/수동 분류
+                       └─ validation   6종 병렬 검증 → 자동/수동 분류 → 확인 카드
                             ├─ hitl     interrupt() → 사용자 선택 → 재계획
                             └─ finalize → persist → compose
 ```
@@ -110,7 +110,8 @@ LLM_BACKEND=openai     # ChatOpenAI / OpenAIEmbeddings
 LLM_BACKEND=fake       # 외부 호출 없이 그래프 구조만 테스트
 ```
 
-주요 튜닝 파라미터는 [`docs/SETUP.md`](docs/SETUP.md) 참조. 특히 `FRICTION_BOOST`(불편 기록 가중)는
+주요 튜닝 파라미터는 [`app/config.py`](app/config.py) 한 곳에 모여 있다(키 발급·실행 절차는
+[`docs/SETUP.md`](docs/SETUP.md)). 특히 `FRICTION_BOOST`(불편 기록 가중)는
 "경고를 놓치는 비용 > 불필요한 경고 비용"이라는 판단이 들어간 값이라 운영 데이터로 재조정한다.
 
 ---

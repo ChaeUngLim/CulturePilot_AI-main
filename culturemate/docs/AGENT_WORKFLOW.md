@@ -38,8 +38,8 @@
  9  응답 구성              근거를 함께 담는다            ── 응용
 10  앱 표시                타임라인 · 지도 · 카드        ── UI
 ────────────────────── 여기까지 1단계 (목표 15초이내) ──────────────────────
-11  POST /threads/{id}/routes    실제 경로 좌표 (A6, 자기 예산 목표(15초이내) 이후 2차 지도 좌표 +5초 이내)
-12  POST /threads/{id}/verify    공식정보 대조 (A4, 자기 예산 목표(15초이내) 이후 2차 지도 좌표 +5초 이내)
+11  POST /threads/{id}/routes    실제 경로 좌표 (A6 — 화면이 그려진 뒤 별도 실행, 자기 예산 60초)
+12  POST /threads/{id}/verify    공식정보 대조 (A4 — 화면이 그려진 뒤 별도 실행, 자기 예산 60초)
 ```
 
 **세 지점에서 규칙이 정해져 있다.**
@@ -103,7 +103,7 @@ graph TD
 ### 2.2 서브그래프 4개 — 안쪽 흐름
 
 ```
-archive      plan_facets → ⟨Send⟩ facet_search ×3 → fuse_rerank → extract_relevant
+archive      plan_facets → ⟨Send⟩ facet_search ×≤6 (facet 3 × 질의 ≤2) → fuse_rerank → extract_relevant
 discovery    search_catalog ∥ search_events ∥ search_always_on ∥ search_web
                  → normalize → ⟨조건부⟩ verify → classify
 itinerary    ctx_geo ∥ ctx_hours ∥ ctx_weather ∥ ctx_preference
@@ -125,13 +125,14 @@ validation   ⟨병렬 6종⟩ check_hours · check_travel · check_overlap
 
 세 가지가 이 워크플로를 «필요한 만큼만 돌고, 필요할 때 멈추는» 것으로 만든다.
 
-### 3.1 조건 분기 — 분기 지점 3곳
+### 3.1 조건 분기 — 분기 지점 4곳
 
 | 지점 | 함수 | 갈래 |
 |---|---|---|
 | 팬아웃 | `router.fan_out` | `archive` · `discovery` · `current_plan` |
 | 일정을 만들 것인가 | `router.need_itinerary` | `itinerary` · `compose` |
 | 확인이 필요한가 | `needs_confirm` | `hitl` · `finalize` |
+| 재계획인가 | `after_review` (§3.3) | `itinerary` · `finalize` |
 
 **라우팅 표 — 요청 유형 7종 × 실행 계획.** `ROUTE_TABLE: dict[RequestType, PlanFlags]`.
 
@@ -160,13 +161,14 @@ validation   ⟨병렬 6종⟩ check_hours · check_travel · check_overlap
 | 탐색 4소스 | 슈퍼스텝 | 4 |
 | 컨텍스트 수집 | 슈퍼스텝 | 4 |
 | 검증 6종 | 슈퍼스텝 | 6 |
-| facet 검색 | **`Send` 동적 팬아웃** | 3 |
+| facet 검색 | **`Send` 동적 팬아웃** | ≤6 (facet 3 × 질의 ≤2) |
 | 후보 검증 | **`Send` 동적 팬아웃** | 실행 시점 결정 (≤12) |
 | 주변 검색 | **`Send` 동적 팬아웃** | 빈틈 × 종류 |
 
-**동적 팬아웃은 개수가 실행 시점에 정해진다.** 남은 시간이 모자라면 갈래 수를 줄인다 —
-줄여도 결과는 나온다. 팬아웃된 노드는 전체 State를 못 보므로 예산(`deadline`)을
-payload에 실어 보낸다.
+**동적 팬아웃은 개수가 실행 시점에 정해진다.** 후보 검증은 남은 시간이 모자라면
+갈래 수부터 줄인다 — 줄여도 결과는 나온다. facet·주변 검색은 갈래 수를 유지하되,
+팬아웃된 노드가 전체 State를 못 보므로 예산(`deadline`)을 payload에 실어 보내
+각 갈래가 스스로 일찍 끝낸다.
 
 ### 3.3 사람 개입 (HITL)
 
@@ -197,11 +199,11 @@ Agent는 서로를 호출하지 않는다. **공유 State에 남긴 산출물을
 |---|---|---|---|
 | A1 Router | `request_type` · `flags` | (덮어쓰기) | `fan_out` · `need_itinerary` |
 | A1 Router | `conditions` (좌표 확정) | (덮어쓰기) | A2 · A3 · A5 · A7 |
-| A2 Preference | `taste_profile` | (덮어쓰기) | A3(점수) · A5(체류시간) |
+| A1 Router(선로드) · A2 Preference | `taste_profile` | (덮어쓰기) | A5(`ctx_preference` 체류시간) · `compose` — A3는 State가 아니라 DB에서 직접 읽는다(`normalize`) |
 | A2 Preference | `archive_hits[]` | `MERGE_BY_ID` | A8(`check_friction`) · `compose` |
-| A2 Preference | `edit_signals[]` | `MERGE_BY_ID` | A9 |
+| A9 Memory(`persist`) | `edit_signals[]` | `MERGE_BY_ID` | A9 자신 → `save_plan_edits` (`ArchiveOutput` 에 키만 선언 — A2는 값을 내지 않는다) |
 | A3 Culture | `candidates[]` | `merge_candidates` | A4 · A5 |
-| A4 Verifier | `verifications[]` | `MERGE_BY_ID` | A5 · UI 배지 |
+| A4 Verifier | `verifications[]` | `MERGE_BY_ID` | `discovery.classify` 가 `candidates[].verify_status` 로 반영 → A5는 그 값을 읽는다 · UI 배지 |
 | A4 Verifier | `place_diffs[]` | `MERGE_BY_ID` | A8(`check_revisit`) |
 | A5·A6·A7 | `itinerary` | (덮어쓰기) | A8 · A9 · UI |
 | A7 Gap | `gaps[]` · `nearby[]` | `MERGE_BY_ID` · `merge_candidates` | `fill_gaps` |
@@ -279,13 +281,14 @@ DiscoveryOutput  conditions(—)   · candidates(R)   · verifications(R) · pla
 |---|---|:--:|:--:|:--:|---|---|
 | **1 · 신규 생성** | «오늘 오후에 성수에서 놀고 싶어요» | ● 전체 | ● 상위 12 | ● 전체 | `PLAN_CREATE` | 일정 전체 생성 · 근거 누적 |
 | **2 · 시간 조정** | «전시를 30분 더 보고 싶어요» | ○ 생략 | ○ 생략(확인 시각 재사용) | ● 재편성만 | `PLAN_MODIFY` | 시간만 조정 · 여유 부족 알림 |
-| **3 · 장소 교체** | «마지막 카페를 다른 곳으로» | ◐ 교체 구간만 | ◐ 새 후보만 | ● 해당 구간 | `PLAN_MODIFY` | 구간 교체 · 전/후 비교 |
-| **4 · 현장 이벤트** | 전시가 1시간 일찍 끝남 | ● 현재 위치 반경 | ● **캐시 무시** | ● 삽입만 | `GAP_FILL` | 공백 추천 · **거절도 동등 선택지** |
+| **3 · 장소 교체** | «마지막 카페를 다른 곳으로» | ○ 생략 | ○ 생략 | ● 해당 구간 | `PLAN_MODIFY` | 구간 교체 · 전/후 비교 |
+| **4 · 현장 이벤트** | 전시가 1시간 일찍 끝남 | ● 현재 위치 반경 | ● 상위 12 | ● 삽입만 | `GAP_FILL` | 공백 추천 · **거절도 동등 선택지** |
 
-● 전체 · ◐ 부분 · ○ 생략
+● 전체 · ○ 생략
 
 - **CASE 2가 가장 빠른 이유** — 새 후보가 필요 없어 탐색을 건너뛰고, 확인 시각을 재사용해 검증도 건너뛴다. 편성만 다시 돌면 된다.
-- **CASE 4가 캐시를 무시하는 이유** — «지금 영업 중인가»는 캐시된 값으로 답할 수 없다.
+- **CASE 3도 라우트는 CASE 2와 같다** — `PLAN_MODIFY` 는 `use_discovery=False` 라 탐색·검증이 아예 돌지 않고, 교체 후보는 **이번 스레드 상태에 이미 쌓인 `candidates[]`** 에서 고른다. «교체 구간만 다시 탐색»하는 부분 실행 경로는 없다.
+- **CASE 4의 «현장성»은 날씨가 맡는다** — `nearby_fill` 플래그가 켜지면 `ctx_weather` 가 초단기실황(지금 비가 오는가)을 조회한다. 검증 경로(`tools/verify.py`)에는 캐시가 없어 «캐시 무시» 같은 특례가 따로 필요 없다.
 - **네 경우 공통** — 변경 전에 사유를 먼저 보여주고 사용자가 고른다. CASE 2~4는 «변경 전 / 변경 후»를 나란히 제시하며, **반영하지 않으면 일정은 그대로다.**
 
 ---
@@ -298,11 +301,15 @@ LangGraph가 **실행 순서와 상태**를, LangChain이 **모델 호출**을 �
 | 역할 | 쓰는 Agent | 무엇에 | 공급자 | 실패하면 |
 |---|---|---|---|---|
 | `router` | A1 | 발화 구조화 추출 | `openai:gpt-4o-mini` | 규칙 파서 결과로 진행 |
-| `planner` | A3 | 관련성 판정 | `openai:gpt-4o-mini` | 규칙 점수로 진행 |
-| `writer` | `compose` · A8 | 일정 서술 · 카드 문구 | NIM `llama-3.1-8b` | 정형 문장으로 폴백 |
-| `fast` | A2 · A4 | facet 생성 · 사실 추출 | `openai:gpt-4o-mini` | 규칙 폴백 |
-| 임베딩 | A2 | 경험 벡터 (1024차원) | NVIDIA NIM | 아카이브 검색만 꺼짐 |
-| 리랭크 | A2 · A7 | cross-encoder 재순위 | NIM `llama-nemotron-rerank-1b-v2` | RRF 결과를 그대로 사용 |
+| `planner` | A2 | 기록 관련성 판정 (`extract_relevant`) | `openai:gpt-4o-mini` | 규칙 폴백으로 진행 |
+| `writer` | `compose` · `GET /report` | 일정 서술 · 취향 리포트 | NIM `llama-3.1-8b` | 정형 문장으로 폴백 |
+| `fast` | A2 · A4 · A9 | facet 생성 · 사실 추출 · 방문기록 요약(`memory/writer.py`) | `openai:gpt-4o-mini` | 규칙 폴백 |
+| 임베딩 | A2 · A9 | 경험 벡터 (1024차원) — 검색과 저장 양쪽 | NVIDIA NIM | 아카이브 검색만 꺼짐 |
+| 리랭크 | A2 | cross-encoder 재순위 | NIM `llama-nemotron-rerank-1b-v2` | RRF 결과를 그대로 사용 |
+
+> 공급자 열은 **`.env` 배선 값**이다(코드 기본값이 아니다 — [REQUIREMENTS.md §5.3](REQUIREMENTS.md)).
+> A8 의 카드 제목·본문·선택지는 LLM이 아니라 **규칙 문자열**로 만든다(`build_confirm_cards`).
+> A7 의 `rerank_nearby` 도 리랭커가 아니라 `personal_score`+날씨 감점의 규칙 계산이다.
 
 **역할을 나눈 기준은 모델 크기가 아니라 «무슨 일을 시키는가»다.** 같은 모델이라도
 평문 생성과 대형 스키마 구조화 출력에서 결과가 정반대로 나온다.

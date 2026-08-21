@@ -17,7 +17,7 @@
 ```
 그래프    11 노드 (서브그래프 4 + 조율 7) · 라우트 7종 · 검증 6종
 API       엔드포인트 23개
-소스      백엔드 Python 10,496줄(54파일) · 모바일 TS 6,542줄
+소스      백엔드 Python 10,657줄(55파일) · 모바일 TS 6,542줄
 테스트    194개 (193 passed · 1 skipped) · ruff All checks passed
 DB        places 2,092 · visits 32 · embeddings 32 · plan_edits 13
 응답      중앙값 5.1초 (NFR-01 목표 15초)
@@ -147,4 +147,4 @@ data.go.kr · OpenAI · KCISA · NVIDIA · OpenRouteService(ORS)
 
 - **`test_docs_contract.py` 는 «셀 수 있는 것»만 지킨다.** 노드 **집합**과 `set(ROUTE_TABLE) == set(RequestType)` 을 볼 뿐, 문서의 «6종»·«11 노드» 같은 **숫자 문장은 읽지 않는다.** 숫자를 고칠 때는 `build.py` 의 `add_node` 호출을 직접 센다.
 - **문서 정합성은 2026-08-18 에 한 번 훑었다.** 테스트 수·줄 수·검증 종류·리듀서 목록·실행 경로·기획안 대조표를 소스와 맞췄다. 그 뒤 코드가 바뀌었다면 같은 항목부터 의심한다.
-- **`.env` 에 `MODEL_ROUTER`·`MODEL_PLANNER`·`MODEL_WRITER`·`MODEL_FAST` 가 비어 있다.** 문서([REQUIREMENTS §5.3](REQUIREMENTS.md))가 권장하는 «역할별 혼합 배선»이 지금 환경에는 적용돼 있지 않고, 네 역할 모두 `LLM_BACKEND=nim` 기본값으로 간다. 응답 품질·시간을 재기 전에 이 값부터 확인한다.
+- **`.env` 의 `MODEL_ROUTER`·`MODEL_PLANNER`·`MODEL_WRITER`·`MODEL_FAST` 는 2026-08-18 에 «역할별 혼합 배선»([REQUIREMENTS §5.3](REQUIREMENTS.md))으로 채워졌다.** 새 환경을 만들면 이 네 칸이 다시 비고, 그러면 네 역할 모두 `LLM_BACKEND=nim` 기본값으로 가 planner·writer 가 70B 로 잡혀 응답이 늘어진다. 응답 품질·시간을 재기 전에 이 값부터 확인한다.

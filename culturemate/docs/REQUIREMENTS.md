@@ -86,7 +86,7 @@ graph TB
 |---|---|
 | **역할** | 과거 방문 기록과 일정 수정 행동에서 개인 취향을 추출해 후보 점수에 반영 |
 | **입력** | `user_id`, 현재 조건(`TripConditions`) |
-| **출력** | `TasteProfile`, `archive_hits[]`, `advisories[]`(경고 카드) |
+| **출력** | `TasteProfile`, `archive_hits[]`, `evidence[]` — 경고 카드는 여기서 만들지 않는다(카드는 Validation 한 곳 · §3.5 UR-11) |
 | **구현** | `app/graph/subgraphs/archive.py`, `app/memory/{retriever,profile,writer}.py` |
 | **저장소** | `visits` · `plan_edits` · `experience_embeddings`(pgvector) · `taste_profiles` |
 
@@ -379,9 +379,11 @@ F1~F6이 모두 구현돼 있다 — **F6(캘린더)은 2026-08-17 에 닫혔다
 
 ✅ 구현 완료 · ⬜ 미구현
 
-> **FR-25~FR-32는 의도적으로 '미구현'으로 표기했다.** 명세서에 있는데 코드에 없으면
-> 심사에서 가장 먼저 드러난다. 콜드 스타트는 카드 스와이프 대신 **내장 카탈로그 + 규칙 폴백**으로
-> 대응하고 있고, 영화는 상영 시간표 API가 유료라 Phase 2로 미뤘다.
+> **⬜ 로 남은 것은 FR-26 · FR-31 · FR-32 셋뿐이고, 의도적으로 '미구현'으로 표기했다.**
+> 명세서에 있는데 코드에 없으면 심사에서 가장 먼저 드러난다. 영화(FR-26)는 상영 시간표
+> API가 유료라 Phase 2로 미뤘다. FR-25(취향 카드)·FR-27·FR-28(캘린더)·FR-29(선제 경고)·
+> FR-30(`plan_edits` 영속화)은 **2026-08-17 에 구현돼 ✅ 가 됐다** — 콜드 스타트 대응도
+> 이제 내장 카탈로그+규칙 폴백이 아니라 카드 스와이프(UR-01)가 맡는다.
 > **FR-27~FR-32는 기획안 대조에서 새로 드러난 항목**이다 — 근거는 [PLANNING.md §7·§8](PLANNING.md).
 >
 > **FR-33 은 «문화 2개 + 디저트 3개» 처럼 종류별로 개수를 말한 경우다**(2026-08-17).
@@ -578,8 +580,9 @@ FR이 «코드가 무엇을 하는가»라면 UR은 «사용자가 무엇을 원
 ```
 
 키가 무엇이 설정됐고 실제로 응답하는지는 `GET /diagnostics?probe=true` 로 한 번에 확인한다.
-**키는 `.env` 에만 둔다** — `.gitignore` 가 제외하고 있고, 저장소에는 값이 빠진
-`.env.example` 만 있다.
+**키는 `.env` 에만 둔다** — `.gitignore` 가 `.env`·`.env.*` 를 제외하므로 키가 커밋될 일이
+없고, 같은 이유로 **저장소에 `.env.example` 은 없다.** 키 이름과 발급 절차는
+[SETUP.md](SETUP.md) 가 전부 적고 있으니 그것을 보고 `.env` 를 직접 만든다.
 
 ---
 
@@ -591,7 +594,7 @@ FR이 «코드가 무엇을 하는가»라면 UR은 «사용자가 무엇을 원
 ```
 MODEL_ROUTER=openai:gpt-4o-mini          발화 이해 — 한국어 구조화 추출
 MODEL_PLANNER=openai:gpt-4o-mini         관련성 판정
-MODEL_WRITER=meta/llama-3.1-8b-instruct  일정 서술 · 경고 카드 문구
+MODEL_WRITER=meta/llama-3.1-8b-instruct  일정 서술 · 취향 리포트 (카드 문구는 LLM이 아니라 규칙 문자열)
 MODEL_FAST=openai:gpt-4o-mini            facet 생성 · 사실 추출 · 요약
 MODEL_EMBED=                             비움 → NIM 유지 (1024차원)
 MODEL_RERANK=nvidia/llama-nemotron-rerank-1b-v2

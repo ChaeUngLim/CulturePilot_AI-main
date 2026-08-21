@@ -27,6 +27,7 @@
    ├─ 2단계  classify        router/          요청 이해 + 좌표 확정
    ├─ 3단계  팬아웃           archive / discovery / current_plan
    ├─ 4단계  merge_context   nodes.py         가진 재료 합치기
+   │         └─ 일정이 필요 없는 요청(need_itinerary=false)은 10단계로 직행
    ├─ 5단계  itinerary       subgraphs/itinerary/     일정 편성
    ├─ 6단계  validation      subgraphs/validation.py  이슈 판정
    ├─ 7단계  hitl            nodes.py         사람에게 묻기(중단)
@@ -82,11 +83,13 @@ GET  /geocode  /whereami  /health  /diagnostics     보조
 이 노드 하나가 **문장 → 실행 가능한 조건**의 전부를 담당한다. 순서가 곧 우선순위다.
 
 ```
-① LLM 추출        asyncio.wait_for(...)         구조화 추출, 실패해도 죽지 않는다
-② 규칙 보정        _merge_rules(decision, rules) LLM이 놓친 걸 정규식이 채운다
-③ 화면값 덮어쓰기   _apply_override(...)          발화가 화면 잔재보다 세다
-④ 취향 반영        _apply_taste(conditions, profile)
-⑤ 좌표 확정        _resolve_places(conditions)   출발·도착·지역 → 좌표
+① 규칙 추출        _safe_rules(query)            정규식이 먼저 돈다
+② LLM 추출        asyncio.wait_for(...)         구조화 추출 — 규칙이 유형·장소·시각을
+                                                전부 잡았으면 건너뛴다(_rules_suffice)
+③ 규칙 보정        _merge_rules(decision, rules) LLM이 놓친 걸 규칙이 채운다
+④ 화면값 덮어쓰기   _apply_override(...)          발화가 화면 잔재보다 세다
+⑤ 취향 반영        _apply_taste(conditions, profile)
+⑥ 좌표 확정        _resolve_places(conditions)   출발·도착·지역 → 좌표
 ```
 
 ### 2.1 규칙 파서 (`_safe_rules` → `_rule_conditions`)
@@ -99,6 +102,8 @@ GET  /geocode  /whereami  /health  /diagnostics     보조
 | `_ADDRESSY` | 주소인가 역 이름인가 (`종로3가역` 은 주소가 아니다) |
 | `_TRANSPORT` | `최단루트→best` `자가용→car` … |
 | `_NOT_PLACE` | `지하철` 같은 수단어가 출발지로 새는 것을 막는다 |
+
+> 표의 상수는 대부분 `router/endpoints.py` 에 있다 — `_TRANSPORT` 만 `rules.py`.
 
 **규칙**
 
@@ -249,11 +254,11 @@ ctx_preference  취향 프로필
                       말했으면 [dwell_min, dwell_max] 로 선형 매핑
                       말 안 했으면 과거 방문 평균(avg_dwell_min)으로 배율 보정
                       어느 쪽이든 장소별 상대 순서는 보존한다
-③ _best_leg() ×N      구간마다 이동수단 결정
+③ _reserve_to_dest()  도착지까지 갈 시간을 먼저 확보하고 편성을 시작한다
 ④ _measure_legs()     실제 거리·시간 측정 (예산 허용 범위 안에서)
+                      — 구간마다 _best_leg() 로 이동수단을 정한다
 ⑤ _reflow()           측정 결과로 시계를 다시 흘린다
-⑥ _reserve_to_dest()  도착지까지 갈 시간을 남겨 둔다
-⑦ _endpoint_notes()   출발/도착 안내 문구
+⑥ endpoint_notes() · _notes_from_conditions()   출발/도착 안내 문구
 ```
 
 **규칙 — 종류별 몫은 «자리를 남기는 것»이지 «멈추는 것»이 아니다.**
@@ -545,7 +550,7 @@ DB가 죽었다고 이미 만든 일정을 사용자에게 못 보여줄 이유�
 | 화면 요소 | 재사용할 것 |
 |---|---|
 | 월/주 그리드 | 신규 (`app/(tabs)/calendar.tsx`) |
-| 날짜 탭 → 그날 일정 | `Timeline` · `NaverMap` · `PlaceFacts` · `EvidenceSheet` **그대로** |
+| 날짜 탭 → 그날 일정 | `Timeline` · `NaverMap` **그대로** (`PlaceFacts` 는 Timeline 안에서 함께 렌더링 — `EvidenceSheet` 는 캘린더에서 쓰지 않는다) |
 | 기록 없는 지난 일정 → 기록 남기기 | 기존 `app/visit.tsx` 로 이동 |
 | 데이터 | `fetchPlans()` → `GET /plans/{user_id}` · `fetchPlan(id)` → `GET /plans/detail/{id}` |
 
@@ -574,7 +579,7 @@ DB가 죽었다고 이미 만든 일정을 사용자에게 못 보여줄 이유�
 | 문화시설 | 문화시설조회서비스 | `tools/culture_api.py` | 미설정이면 네이버 지역검색만 |
 | 날씨 | 기상청 API허브 | `tools/weather.py` | 컨테이너는 UTC, 발표는 KST |
 | 웹검색 | Tavily → Exa | `tools/websearch.py` | 앞이 0건이면 뒤로 넘어간다 |
-| LLM · 임베딩 · 리랭크 | NVIDIA NIM | `llm/provider.py` | 임베딩은 백엔드를 바꿔도 NIM 유지 |
+| LLM · 임베딩 · 리랭크 | NVIDIA NIM | `llm/provider.py` | 임베딩은 백엔드를 따라간다 — 고정은 제공자가 아니라 **차원 1024** |
 
 **규칙 — 날씨 제공자는 두 갈래다.** `KMA_API_HUB_KEY` 가 있으면 기상청 API허브를,
 없으면 공공데이터포털을 쓴다(`config.weather_source`). 둘은 **엔드포인트와 인증
@@ -582,7 +587,9 @@ DB가 죽었다고 이미 만든 일정을 사용자에게 못 보여줄 이유�
 
 **규칙 — 임베딩 차원은 스키마와 묶여 있다.** `EMBED_DIM=1024` 는
 `db/001_schema.sql` 의 `vector(1024)` 와 짝이다. 모델을 바꾸려면 스키마와 기존
-임베딩을 함께 재생성해야 하므로, LLM 백엔드를 교체해도 임베딩만은 NIM 무료를 유지한다.
+임베딩을 함께 재생성해야 한다. 그래서 임베딩 제공자는 백엔드를 따라가되(`get_embeddings`),
+**차원 1024만은 어느 백엔드에서도 유지한다** — OpenAI 백엔드는 `text-embedding-3-large`
+에 `dimensions=1024` 를 지정해 맞추고, 키가 없으면 결정론적 가짜 임베딩으로 폴백한다.
 
 **경로 API 3종(NAVER · ORS · ODsay)은 전부 무료 티어다.** 유료 제공자를 섞으면
 배포에 고정비가 생기고, 키가 없는 환경에서는 그 구간이 통째로 비어 일정이 성립하지 않는다.
@@ -670,7 +677,10 @@ DB의 시각 컬럼은 **전부 `timestamptz`** 라 읽어오면 aware 로 돌�
 
 ```
 app/
+  config.py              전역 설정 — 환경변수 단일 진입점
+  schemas.py             도메인 모델 (Candidate · Itinerary · Advisory · Evidence …)
   api/main.py            HTTP · SSE · 칩 재료(_resolved)
+  api/schemas.py         요청/응답 전용 모델
   graph/
     build.py             그래프 조립 (여기서 전체 흐름을 읽는다)
     router/              2단계 — 요청 이해 + 좌표 확정
@@ -690,7 +700,7 @@ app/
       discovery.py       후보 탐색 + 검증
       itinerary/         일정 편성
         __init__.py        서브그래프 조립 · 공개 이름
-        schedule.py        순서·시각 배치                ★ 264줄
+        schedule.py        순서·시각 배치                ★ 263줄
         placement.py       하루 경계 · 배치 판단 · 쿼터   ★ 236줄
         legs.py            구간 이동 측정 · 최단루트
         gaps.py            공백 탐지 → 주변 추천 → 채우기
@@ -713,17 +723,25 @@ mobile/
   app/(tabs)/            index(오늘의 일정) · calendar(UR-28) · curation · archive · report
   app/visit.tsx          관람 기록 추가 (모달)
   app/connect.tsx        서버 연결 — 주소 확인·저장·목 모드 전환 (모달)
+  app/taste-cards.tsx    취향 카드 스와이프 (UR-01 · UR-31)
   src/
-    hooks/useCultureMate.ts    상태 한 곳
-    components/                공통 컴포넌트 (11.2)
+    hooks/useCultureMate.ts    상태 한 곳 (+ useCurrentLocation.ts · context.tsx)
+    components/                공통 컴포넌트 (11.2) + ErrorBoundary · ProgressTrace · ui
     api/client.ts + mock.ts    SSE · sync · 목 어댑터 · probeServer
+    api/types.ts               서버 스키마 미러 (StreamEvent · SyncResult …)
     config.ts                  apiUrl() · isMock() — 런타임에 바뀐다(연결 화면)
     store/storage.ts           오프라인 캐시 + 저장된 서버 주소
     constants.ts               KIND_LABEL · FRICTION_LABEL (단일 원천)
+    theme.ts                   색·간격 토큰
+  scripts/               verify-flow.mjs(계약 검증 17항목) · start-tunnel.mjs
 
 db/001_schema.sql        사용자 · 장소 · 방문 · 경험임베딩 · 취향집계 · 컬렉션
+scripts/                 seed_demo · generate_catalog(+_catalog_data) · check_apis
+                         bench_models · render_graph · find_culture_api
 docs/                    ARCHITECTURE(왜) · STRUCTURE(어떻게) · REQUIREMENTS(무엇을)
-                         FUNCTIONAL_MAP(어디에) · PLANNING(기획안 대조) · SETUP · PROGRESS · TEST
+                         FUNCTIONAL_MAP(어디에) · PLANNING(기획안 대조) · SETUP · PROGRESS
+                         TEST · TEST_FUNCTIONAL · HANDOFF
+                         AGENT_ROLES · AGENT_WORKFLOW · SYSTEM_C4 · diagrams/
 tests/                   194개 (193 passed · 1 skipped)
   test_docs_contract.py  문서 ↔ 소스 정합성을 고정 (노드·라우트·라우팅 표·HITL 조건)
 ```
@@ -747,7 +765,7 @@ docker compose run --rm --no-deps \
 | `mobile/src/components/OriginPicker.tsx` | 삭제 → 타입만 `RoutePoints.types.ts` 로 |
 | `reducers._higher_score`, `reducers.take_last` | 삭제 (호출부 없음) |
 | `router._detect_region` | 삭제 (`_detect_regions` 로 대체됨) |
-| `types.ts` `RequestType`·`VerifyStatus`·`ChatRequest` | 삭제 (서버 계약만 베낀 미사용 타입) |
+| `types.ts` `RequestType`·`ChatRequest` | 삭제 (서버 계약만 베낀 미사용 타입 — `VerifyStatus` 는 사용 중이라 남겼다) |
 | `ui.tsx` `Divider`, `mock.ts` `MOCK_SEEDS` | 삭제 |
 | `constants.CATEGORY_LABEL` ↔ `PlaceFacts.KIND_LABEL` | 중복 → `constants.KIND_LABEL` 하나로 |
 | `db/repo._jsonb` | `jsonb` 로 공개 (모듈 두 곳에서 쓴다) |

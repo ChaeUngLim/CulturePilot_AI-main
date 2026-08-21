@@ -61,13 +61,13 @@
 
 ```bat
 :: 백엔드 (컨테이너 1개 = PostgreSQL + API)
-백엔드실행.bat
+cd culturemate && 백엔드실행.bat
 
-:: 앱 (웹)
-cd culturemate\mobile && npm start
+:: 앱 (웹) — 포트를 지정하지 않으면 Expo 기본 8081 로 뜬다
+cd culturemate\mobile && npm start -- --web --port 19006
 ```
 
-- 백엔드 `http://localhost:8000` · 앱 `http://localhost:19006`
+- 백엔드 `http://localhost:8000` · 앱(웹) `http://localhost:19006` (포트 지정 시)
 - `.env` 를 고치면 **재생성**해야 한다. `restart` 로는 반영되지 않는다.
 - 시드: `docker exec culturemate python scripts/seed_demo.py`
 

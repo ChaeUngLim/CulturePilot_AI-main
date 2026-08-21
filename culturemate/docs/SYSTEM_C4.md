@@ -149,7 +149,7 @@ graph TD
 | `memory/` · `db/` | 저장소 접근 · 프로필 집계 | 인프라 + 도메인 |
 
 **공유 State** — 위 모든 산출물이 여기 누적되고, 정지 시 통째로 저장된다.
-**A3 · A4 · A6 · A7 만 도구 계층을 통해 바깥에 닿는다.** A1 · A5 · A8 · A9 는 닿지 않는다.
+**바깥(외부 API)에 닿는 것은 A1(좌표 확정) · A3 · A4 · A5(이동 행렬·날씨 컨텍스트) · A6 · A7(주변 검색)이고, 전부 도구 계층을 거친다.** A2 · A8 · A9 는 도구 계층에 닿지 않는다 — 모델·저장소 계층만 쓴다.
 
 병렬 갈래가 같은 채널에 쓸 때 무엇이 이 상태를 지키는지는
 [AGENT_WORKFLOW.md §4.0](AGENT_WORKFLOW.md) 에 있다.
@@ -173,7 +173,7 @@ graph TD
 | 체크포인트 | `checkpoints` · `checkpoint_blobs` · `checkpoint_writes` | 그래프 |
 
 - **벡터 인덱스** — HNSW `m=16, ef_construction=64`, cosine. `vector(1024)` 는 `EMBED_DIM=1024` 와 **짝으로 고정**이다. 모델을 바꾸려면 스키마와 기존 임베딩을 함께 재생성해야 한다.
-- **개인정보 통제(UR-17)** — `users` 를 참조하는 모든 테이블에 `ON DELETE CASCADE`. 단 `place_snapshots` 는 `SET NULL` — 공식정보 스냅샷은 개인정보가 아니라 사실 기록이므로 다른 사용자의 검증 근거로 남는다.
+- **개인정보 통제(UR-17)** — `users` 를 참조하는 모든 테이블에 `ON DELETE CASCADE`. 단 `place_snapshots` 는 `users` FK 자체가 없다 — 공식정보 스냅샷은 개인정보가 아니라 사실 기록이므로, 사용자를 지워도 다른 사용자의 검증 근거로 남는다. (`SET NULL` 은 `visits.plan_id` · `experience_embeddings.place_id` 두 곳에 쓰였다.)
 
 ---
 

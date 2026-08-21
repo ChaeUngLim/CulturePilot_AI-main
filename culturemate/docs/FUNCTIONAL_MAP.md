@@ -39,7 +39,7 @@
 [PostgreSQL 18 + pgvector]  테이블 13개 + 체크포인트 3개
 ```
 
-**규모**: 백엔드 Python **10,496줄**(54파일) / 모바일 TS **6,542줄**(`src` 4,042 + `app` 2,500) / 테스트 **194개**.
+**규모**: 백엔드 Python **10,657줄**(55파일) / 모바일 TS **6,542줄**(`src` 4,042 + `app` 2,500) / 테스트 **194개**.
 
 ---
 
@@ -211,7 +211,7 @@ search_web        ┘  Tavily → Exa 폴백
 |---|---|
 | **코드** | `app/tools/verify.py` (235줄) · `discovery.classify` |
 | **데이터** | `place_snapshots` |
-| **화면** | `Timeline.tsx` 의 `✓ 공식정보 확인` / `확인 필요` 배지 |
+| **화면** | `PlaceFacts.tsx` 의 `✓ 공식정보 확인` / `확인 필요` 배지 (`Timeline` 이 `verifyStatus` 를 전달한다) |
 
 ```
 verified     공식 출처와 일치        → 그대로
@@ -274,7 +274,7 @@ final_score = 0.6 × relevance + 0.4 × personal_score
 | | |
 |---|---|
 | **코드** | `app/tools/maps.py` (402줄) · `app/tools/kakao_local.py` (130줄) · `app/tools/routing.py` (220줄) |
-| **화면** | `mobile/src/components/NaverMap.tsx` (580줄) |
+| **화면** | `mobile/src/components/NaverMap.tsx` (585줄) |
 | **엔드포인트** | `POST /threads/{id}/routes` · `POST /reroute` |
 
 **무료 경로 API 3종을 수단별로 나눠 쓴다.**
@@ -454,7 +454,7 @@ OR로 읽으면 자동으로 고칠 수 있는 사소한 이슈까지 전부 올
 | `web` | `discovery.search_web` — 후보가 못 된 검색 결과도 근거로는 남는다 |
 | `official` | `tools/verify.py` — 공식 출처 대조 |
 | `rule` | `validation.build_confirm_cards` — 어떤 검증 규칙이 걸렸는지 |
-| `archive` | `memory/retriever.py` — 과거 기록 |
+| `archive` | `subgraphs/archive.py` · `validation.check_friction` — 과거 기록 (retriever 는 `ArchiveHit` 만 반환한다) |
 
 **모바일 페이로드 절감** — 응답에는 `evidence_ids` 만 싣고 원문은 지연 로드한다.
 
@@ -471,8 +471,9 @@ OR로 읽으면 자동으로 고칠 수 있는 사소한 이슈까지 전부 올
 `visits` · `plans` · `plan_edits` · `experience_embeddings` · `taste_profiles` ·
 `hitl_decisions` · `preference_cards` · `user_collections`.
 
-`place_snapshots` 는 `ON DELETE SET NULL` — 공식정보 스냅샷은 개인정보가 아니라
+`place_snapshots` 에는 `users` FK 자체가 없다 — 공식정보 스냅샷은 개인정보가 아니라
 사실 기록이므로, 사용자가 지워져도 다른 사용자의 검증 근거로 남는다.
+(`ON DELETE SET NULL` 은 `visits.plan_id` · `experience_embeddings.place_id` 두 곳이다.)
 
 ---
 
@@ -558,6 +559,7 @@ check_friction
      ├─ discovery      (후보 탐색)                  UR-03 · UR-04
      └─ current_plan   (수정 요청 시)               UR-09
 [4] merge_context                  nodes.py        병렬 브랜치 합류
+     └─ 일정이 필요 없으면(need_itinerary=false, 예: ARCHIVE_QUERY) [9] compose 로 직행
 [5] itinerary                      itinerary/      UR-05 · UR-06 · UR-07 · UR-08
 [6] validation (6종 ∥)             validation.py   이슈 판정
 [7] hitl        ─── 확인 필요 ───→ interrupt()      UR-13
@@ -579,11 +581,12 @@ check_friction
 
 ## 4. 파일 지도
 
-### 백엔드 (10,496줄 · 54파일)
+### 백엔드 (10,657줄 · 55파일)
 
 ```
 app/
-├── api/main.py              878  엔드포인트 23개 · SSE · 2단계 API
+├── api/main.py              892  엔드포인트 23개 · SSE · 2단계 API
+├── api/schemas.py            59  요청/응답 전용 모델
 ├── graph/
 │   ├── build.py             142  그래프 조립 + Postgres 체크포인터(커넥션 풀)
 │   ├── router/            1,268  UR-02  분류 + 규칙 파서 + 좌표 확정 (6모듈)
@@ -614,9 +617,13 @@ app/
 │   ├── retriever.py         233  UR-10  facet 검색 + RRF + 리랭크
 │   ├── writer.py            166  UR-10  경험 요약 + 임베딩
 │   └── profile.py           269  취향 프로필 재구성
+├── db/
+│   ├── repo.py              251  UR-09·28  질의 전부 (save/list/load)
+│   └── session.py            42  커넥션 풀
 ├── llm/provider.py          245  역할별 모델 배분 (router/planner/writer/fast)
+├── llm/prompts.py            56  역할별 시스템 프롬프트
 ├── schemas.py               485  도메인 모델 전부
-└── config.py                166  설정 · API 키
+└── config.py                169  설정 · API 키
 ```
 
 ### 모바일 `src/` (4,042줄 · 화면 `app/` 2,500줄은 별도)
@@ -632,12 +639,16 @@ mobile/src/
 │   ├── AdvisoryCard.tsx     114  UR-13  확인 카드
 │   ├── EvidenceSheet.tsx    112  UR-14  근거 열람
 │   ├── TransportPicker.tsx  111  UR-06  이동수단
-│   └── Timeline.tsx          93  UR-05  일정 타임라인
+│   ├── Timeline.tsx          93  UR-05  일정 타임라인
+│   └── PlaceFacts.tsx        93  UR-04  검증 배지 · 주차·실내 칩
 ├── api/
 │   ├── client.ts            653  SSE + sync 폴백 + 2단계 호출
 │   ├── mock.ts              472  오프라인 개발용
 │   └── types.ts             265  서버 계약
-└── hooks/useCultureMate.ts  257  상태 관리 · fillRoutes()
+├── hooks/useCultureMate.ts  257  상태 관리 · fillRoutes()
+└── (그 외) ErrorBoundary · ProgressTrace · ui · RoutePoints.types
+          config.ts · constants.ts · theme.ts · store/storage.ts
+          hooks/context.tsx · hooks/useCurrentLocation.ts
 ```
 
 ### 데이터 (13 테이블 + 체크포인트 3)

@@ -282,12 +282,12 @@ cd /d C:\Users\31\Documents\CulturePilot_AI-main\culturemate
 
 배치 파일이 하는 일: 이전 컨테이너 정리 → 이미지 빌드 → 기동 → 시드 데이터 여부 확인.
 
-직접 치실 거면:
+직접 치실 거면 (WATCHFILES 두 개는 Windows 바인드 마운트에서 `--reload` 감시자가 죽지 않게 하는 값입니다 — 배치 파일과 동일):
 
 ```bat
 docker rm -f culturemate
 docker build -t culturemate-api .
-docker run -d --name culturemate --env-file .env -e POSTGRES_USER=culturemate -e POSTGRES_PASSWORD=culturemate -e POSTGRES_DB=culturemate -p 8000:8000 -v culturemate_pgdata:/var/lib/postgresql -v "%CD%\app:/srv/app" -v "%CD%\scripts:/srv/scripts" -v "%CD%\db:/docker-entrypoint-initdb.d:ro" culturemate-api uvicorn app.api.main:app --host 0.0.0.0 --port 8000 --reload
+docker run -d --name culturemate --env-file .env -e POSTGRES_USER=culturemate -e POSTGRES_PASSWORD=culturemate -e POSTGRES_DB=culturemate -e WATCHFILES_FORCE_POLLING=true -e WATCHFILES_POLL_DELAY=2 -p 8000:8000 -v culturemate_pgdata:/var/lib/postgresql -v "%CD%\app:/srv/app" -v "%CD%\scripts:/srv/scripts" -v "%CD%\db:/docker-entrypoint-initdb.d:ro" culturemate-api uvicorn app.api.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 > **컨테이너 하나에 PostgreSQL + API가 함께 들어 있습니다.** 베이스 이미지가
@@ -335,7 +335,7 @@ kakao_local · naver_local_search · websearch · ors · odsay · llm
 > `naver_local_search` 의 `served_by` 를 함께 봅니다 — `kakao` 면 카카오가 답한 것이고,
 > `naver` 면 카카오가 실패했거나 키가 없어 폴백으로 내려간 것입니다.
 
-> `TOUR_API_KEY` · `MARKET_API_KEY` 는 배선 전이라 여기 나타나지 않습니다(§2 ⑪).
+> `TOUR_API_KEY` · `MARKET_API_KEY` 는 배선 전이라 여기 나타나지 않습니다(§2 ⑫).
 >
 > **`culture_api` 는 `ok: true` 여도 한 번 더 봅니다.** `from_api` 가 0 이고
 > `from_fallback` 이 N 이면 키·주소가 아니라 **웹검색이 대신 답한 것**입니다 —

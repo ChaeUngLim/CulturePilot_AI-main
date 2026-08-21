@@ -4,15 +4,16 @@ Expo(SDK 57) + expo-router. **백엔드 없이도 전체 플로우가 돌아갑�
 
 ```bash
 npm install
-cp .env.example .env
-npm start          # QR 스캔 → Expo Go
+npm start          # QR 스캔 → Expo Go — .env 없이 켜면 목(mock) 모드
 ```
 
-`.env`의 `EXPO_PUBLIC_API_URL`이 비어 있으면 목 모드로 동작합니다.
-FastAPI를 띄웠다면 값을 채우면 그대로 실서버로 붙습니다 (앱 코드는 그대로).
+`.env` 파일은 저장소에 없습니다(`.env.example` 도 없습니다). `EXPO_PUBLIC_API_URL`이
+비어 있으면 목 모드로 동작하고, FastAPI를 띄웠다면 `mobile/.env` 를 직접 만들어 값을
+채우면 그대로 실서버로 붙습니다 (앱 코드는 그대로). 주소는 앱 안의 **서버 연결
+화면(`app/connect.tsx`)에서 런타임에도** 바꿀 수 있습니다.
 
 ```bash
-# 실기기는 localhost가 아니라 PC의 LAN IP
+# mobile/.env — 실기기는 localhost가 아니라 PC의 LAN IP
 EXPO_PUBLIC_API_URL=http://192.168.0.10:8000
 ```
 
@@ -23,8 +24,12 @@ EXPO_PUBLIC_API_URL=http://192.168.0.10:8000
 | 탭 | 하는 일 |
 |---|---|
 | **오늘** | 요청 입력 → 노드 진행 표시 → 일정 타임라인 + 지도 → **확인 카드** → 선택 반영 |
+| **캘린더** | 월 그리드 → 날짜 탭 → 그날 일정(타임라인+지도) · 기록 없는 지난 일정은 «기록 남기기»로 (UR-28) |
 | **아카이브** | 방문 기록 목록, 오늘 일정에서 바로 기록 추가 (별점·불편 태그·사진) |
+| **큐레이션** | 내 방문 기록에서 뽑은 테마 지도, 컬렉션 저장·이동수단 재계산 |
 | **취향** | 선호 카테고리, 실내/야외·재방문/신규 성향, 주요 불편 요소 |
+
+모달 화면: `visit`(기록 입력) · `connect`(서버 연결) · `taste-cards`(취향 카드 스와이프, UR-01).
 
 핵심 화면을 라우팅으로 쪼개지 않은 이유: 사용자는 "일정 생성 → 경고 확인 → 선택 → 일정 변경"을
 **하나의 사건**으로 경험합니다. 화면을 나누면 무엇 때문에 일정이 바뀌었는지 맥락이 사라집니다.
@@ -94,15 +99,17 @@ npm run export      # 웹 번들 빌드로 전체 컴파일 확인
 mobile/
 ├── app/                        # expo-router
 │   ├── _layout.tsx
-│   ├── (tabs)/{index,archive,report}.tsx
-│   └── visit.tsx               # 관람 기록 입력 (모달)
+│   ├── (tabs)/{index,calendar,archive,curation,report}.tsx
+│   ├── visit.tsx               # 관람 기록 입력 (모달)
+│   ├── connect.tsx             # 서버 연결 — 주소 확인·저장·목 모드 전환 (모달)
+│   └── taste-cards.tsx         # 취향 카드 스와이프 (UR-01)
 ├── src/
 │   ├── api/{client,mock,types}.ts   # SSE+sync 클라이언트 / 목 백엔드 / 서버 스키마 미러
-│   ├── components/                  # Timeline · AdvisoryCard · EvidenceSheet · NaverMap · Composer
-│   ├── hooks/{useCultureMate,useCurrentLocation,context}.tsx
+│   ├── components/                  # Timeline · AdvisoryCard · EvidenceSheet · NaverMap · Composer …
+│   ├── hooks/                       # useCultureMate.ts · useCurrentLocation.ts · context.tsx
 │   ├── store/storage.ts             # 오프라인 캐시 + 미동기화 기록 큐
 │   └── {config,theme,constants}.ts
-└── scripts/verify-flow.mjs
+└── scripts/{verify-flow,start-tunnel}.mjs
 ```
 
 `src/api/types.ts`는 서버 `app/schemas.py`의 미러입니다. 서버 스키마가 바뀌면 여기만 고칩니다.

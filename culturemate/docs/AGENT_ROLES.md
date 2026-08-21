@@ -35,7 +35,7 @@
 | 기준 | 물음 | 예 |
 |---|---|---|
 | **실패 독립성** | 이것만 죽어도 나머지가 성립하는가 | Culture(A3)가 외부 쿼터로 비어도 Preference(A2)의 기록으로 일정이 나온다 |
-| **관심사 계층** | 외부를 알아야 하는가, 순수 계산인가 | Planner(A5)는 외부를 모른다 · Route(A6)는 경로 API를 쓴다 |
+| **관심사 계층** | 외부를 알아야 하는가, 순수 계산인가 | Planner(A5)의 편성 계산은 외부를 모른다 · Route(A6)는 경로 API를 쓴다 |
 | **변경 축** | 무엇이 바뀌면 이것만 고치면 되는가 | 경로 제공자가 바뀌면 A6만, 검증 기준이 바뀌면 A4만 |
 
 **셋 중 하나라도 갈리면 나눈다.** 나누지 않으면 «탐색이 실패했는데 일정도 안 나온다»
@@ -86,7 +86,7 @@
 
 | # | Agent | 책임 — 한 문장 | 입력 | 출력 (State 채널) | 관심사 | 구현 |
 |:--:|---|---|---|---|:--:|---|
-| A1 | **Router** | 발화를 실행 계획으로 바꾼다 | 자연어 발화 · 화면 입력값 · 취향 프로필 | `request_type` · `plan_flags` · `conditions`(좌표 확정) | 응용 | `graph/router/` (6모듈) |
+| A1 | **Router** | 발화를 실행 계획으로 바꾼다 | 자연어 발화 · 화면 입력값 · 취향 프로필 | `request_type` · `flags`(`PlanFlags`) · `conditions`(좌표 확정) | 응용 | `graph/router/` (6모듈) |
 | A2 | **Preference** | 과거 기록에서 취향과 불편을 뽑는다 | `user_id` · `conditions` | `taste_profile` · `archive_hits[]` · `evidence[]` | 응용 | `subgraphs/archive.py` · `memory/{retriever,profile}.py` |
 | A3 | **Culture** | 조건에 맞는 장소 후보군을 만든다 | `conditions`(지역·날짜·좌표·관심사) | `candidates[]` · `evidence[]` | 응용 | `subgraphs/discovery.py` · `tools/{culture_api,websearch,local_catalog,region}.py` |
 | A4 | **Verifier** | 후보가 실재하는지 공식정보로 가른다 | `candidates[]` 상위 12개 | `verifications[]` · `place_diffs[]` · `evidence[]` | 응용 | `discovery.verify_node` · `tools/verify.py` |
@@ -97,7 +97,8 @@
 | A9 | **Memory** | 이번 행동에서 배울 것을 남긴다 | 사용자 선택 · 일정 diff · 방문 기록 | `plan_edits` 행 · 갱신된 `taste_profiles` | 응용 | `nodes.persist` · `memory/{writer,profile}.py` |
 
 **관심사 4계층** — UI · 응용(조율) · 도메인(순수 계산) · 인프라(바깥과 닿는 것).
-A5 · A7 은 **외부 호출이 없다.** 그래서 도메인이고, 그래서 재현 가능하다.
+A5 · A7 의 **판단 로직**(schedule · placement · dwell · fill_gaps)은 외부 호출이 없다. 그래서 도메인이고, 그래서 재현 가능하다.
+다만 입력 수집은 도구 계층을 거친다 — A5 의 `ctx_geo`(이동 행렬)·`ctx_weather`(날씨), A7 의 `nearby_search`(주변 검색).
 A6 은 도메인 규칙(주차·환승 환산)을 갖지만 실측을 위해 도구 계층에 닿으므로 접점에 둔다.
 
 ---
@@ -138,10 +139,11 @@ A6 은 도메인 규칙(주차·환승 환산)을 갖지만 실측을 위해 도
 | **저장소** | `visits` · `plan_edits` · `experience_embeddings`(pgvector 1024차원) · `taste_profiles` · `preference_cards` |
 
 ```
-plan_facets → ⟨Send 팬아웃⟩ facet_search ×3 → fuse_rerank → extract_relevant
+plan_facets → ⟨Send 팬아웃⟩ facet_search ×≤6 → fuse_rerank → extract_relevant
 ```
 
 **3 facet 병렬** — 단일 질의로는 세 종류 이웃을 동시에 못 잡는다.
+facet 마다 질의를 최대 2개 만들어 `Send` 갈래는 최대 6이다(LLM 폴백 경로에서는 facet 당 1개 = 3갈래).
 
 | facet | 잡는 것 |
 |---|---|
@@ -222,15 +224,16 @@ excluded     불일치·종료 확인     → 제외
 ```
 ① _meal_slot()        식사는 시간대가 정해져 있다 — 자리를 먼저 잡는다
 ② _apply_dwell()      체류시간 (말했으면 그 범위, 아니면 과거 평균 배율)
-③ _best_leg() ×N      구간별 이동수단
-④ _measure_legs()     실측 (예산 허용 범위 안에서)
+③ _reserve_to_dest()  도착지까지 갈 시간을 먼저 확보하고 편성 시작
+④ _measure_legs()     구간 실측 — 구간마다 _best_leg() 로 수단 선택 (예산 안에서)
 ⑤ _reflow()           측정 결과로 시계를 다시 흘린다
-⑥ _reserve_to_dest()  도착지까지 갈 시간 확보
-⑦ endpoint_notes()    출발·도착 안내 문구
+⑥ endpoint_notes() · _notes_from_conditions()   출발·도착 안내 문구
 ```
 
 ```
-score(c) = final_score(c) − travel_min/120 + (10 if 사용자 확정 장소 else 0)
+score(c) = final_score(c) − travel_min/120
+           − dist(c, 도착지)/20 × pull      ← 도착지 지정 시, 남은 자리 2개 미만에서만
+           + (10 if 사용자 확정 장소 else 0)
 제약      depart ≤ day_end  ∧  운영시간 내  ∧  휴관일 아님
 ```
 
@@ -312,7 +315,8 @@ MEAL_WINDOWS = ((11:30, 13:30, "meal"), (17:30, 19:30, "meal"))
 ```
 START → ⟨병렬 6종⟩ check_hours · check_travel · check_overlap
                    check_weather · check_revisit · check_friction
-      → triage → build_confirm_cards → interrupt() → 사용자 선택
+      → triage → build_confirm_cards
+      → (카드가 있으면 메인 그래프 hitl 노드가 interrupt()) → 사용자 선택
 ```
 
 | 검사 | 보는 것 |
@@ -349,7 +353,7 @@ _decision_signals(state)  →  확정 카드에서 고른 것 (drop·replace·re
 extract_edit_signals()    →  두 일정 버전의 diff
 _merge_signals(①,②)      →  같은 사건을 두 번 세지 않는다
 save_plan_edits()         →  plan_edits   신호 하나 = 행 하나
-rebuild_profile()         →  taste_profiles
+apply_edit_signals()      →  taste_profiles 증분 갱신 (프로필이 없는 첫 사용자만 rebuild_profile())
 ```
 
 **신호를 두 갈래로 뽑는 이유** — 처음 만든 일정에서 카드로 장소를 빼면 diff는 아무것도

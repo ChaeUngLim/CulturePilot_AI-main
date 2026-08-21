@@ -19,7 +19,7 @@
 
 | 주장 | 무너지는 방식 | 이 설계의 보장 장치 |
 |---|---|---|
-| 과거 경험이 다음 추천에 개입한다 | 아카이브를 사후 조회로만 쓰면 개입 시점을 놓친다 | 탐색보다 **먼저** 아카이브를 조회하고, 그 결과가 후보 점수·경고·대안의 입력이 된다 (§5) |
+| 과거 경험이 다음 추천에 개입한다 | 아카이브를 사후 조회로만 쓰면 개입 시점을 놓친다 | `classify` 가 취향 프로필을 **선로드**하고, 아카이브를 탐색과 **같은 슈퍼스텝에서 병렬 조회**해 그 결과가 후보 점수·경고·대안의 입력이 된다 (§5, §11) |
 | 실행 가능한 일정이다 | LLM이 이동시간·운영시간을 지어낸다 | 스케줄링은 **결정론적 코드**가 담당, LLM은 이유 서술과 취향 정렬만 (§7) |
 | AI가 임의로 바꾸지 않는다 | 자동 수정이 편해서 슬쩍 넘어간다 | 검증 결과를 `auto_fixable` 기준으로 **강제 분기**, 사용자 판단 항목은 `interrupt()`로 그래프를 정지 (§8) |
 | **기록이 다시 쌓인다** | 만든 일정을 **다시 열 수 없으면** 기록이 남지 않고, 첫 주장이 다음 바퀴에서 무너진다 | 일정을 `plans`에 날짜와 함께 영속화하고(§9), **캘린더로 되돌아가는 진입점**을 둔다 — **UR-28**(§12) |
@@ -46,7 +46,7 @@
 graph TB
     subgraph client["클라이언트 (React Native)"]
         UI["일정 타임라인 · 지도 · HITL 카드 · 아카이브"]
-        NAT["네이티브: GPS · 푸시 · 공유 시트 · 오프라인 캐시"]
+        NAT["네이티브: GPS · 오프라인 캐시"]
     end
 
     subgraph api["API (FastAPI)"]
@@ -230,7 +230,8 @@ class CultureMateState(TypedDict, total=False):
 
 ```python
 StateGraph(ArchiveState, output_schema=ArchiveOutput)
-#  ArchiveState  : user_id, conditions, candidates(입력) + facets, facet_hits(private)
+#  ArchiveState  : user_id, raw_query, conditions, candidates, current_itinerary(입력)
+#                  + facets, facet_hits(private)
 #  ArchiveOutput : archive_hits, edit_signals, taste_profile, evidence, trace
 ```
 
@@ -388,7 +389,7 @@ graph TD
 
 `search_catalog`(내장 장소 카탈로그)가 **바닥을 받친다.** 외부 소스만으로는 결과가 0건이 되는 경우가 잦다 — 키 미설정, 쿼터 초과, 공공 API가 소규모 공간을 안 담음. 외부 호출 없이 즉시 응답하는 레인이 하나 있어야 "아무것도 안 나온다"가 사라진다.
 
-`normalize`가 검증 앞에 오는 이유는 비용이다. 검증은 후보당 웹 호출을 유발하므로, 기간 이탈·제외 조건·중복을 먼저 걷어내고 상위 `CANDIDATE_POOL`개만 검증한다.
+`normalize`가 검증 앞에 오는 이유는 비용이다. 검증은 후보당 웹 호출을 유발하므로, 기간 이탈·제외 조건·중복을 먼저 걷어내고 랭킹 풀로 상위 `CANDIDATE_POOL`(60)개만 남긴 뒤, 그중 **상위 `VERIFY_TOP_K`(12)개만** `Send`로 검증한다(동시 실행 `VERIFY_CONCURRENCY=8`, 예산이 부족하면 갈래 수를 더 줄인다).
 
 **검증 결과 3분류**: `verified`(공식 출처 일치) / `needs_check`(정보 부족 → 점수 0.8배 감점 후 "확인 필요" 표시로 노출) / `excluded`(불일치·종료 → 제외). `needs_check`를 배제하지 않는 게 중요하다. 소규모 공방·독립서점은 공식 정보가 원래 부실하고, 이들을 전부 떨구면 "상시 문화공간 추천"이라는 차별점이 사라진다.
 
@@ -431,7 +432,7 @@ score(c) = final_score(c) − travel_min/120
 
 **날씨 반영**은 후보 점수 보정으로 처리한다(악천후 시간대: 실내 +0.2, 야외 −0.3). 하드 제약으로 만들면 비 오는 날 야외 축제가 목적인 사용자의 요청을 시스템이 거부하게 된다.
 
-**공백 채우기**는 40분 이상 유휴 구간과 종료 후 60분 이상 잔여 시간을 찾아, 시각대에 따라 목적(식사/휴식/자유)을 정하고 `공백 × 카테고리`로 `Send` 팬아웃한다. 반경은 남은 시간에 비례(60분 미만 500m, 이상 1200m)해 "가면 못 돌아오는 추천"을 막는다.
+**공백 채우기**는 40분 이상 유휴 구간과, 첫 일정 이전·종료 후의 60분 이상 잔여 시간을 찾아, 시각대에 따라 목적(식사/휴식/자유)을 정하고 `공백 × 카테고리`로 `Send` 팬아웃한다. 반경은 남은 시간에 비례(60분 미만 500m, 이상 1200m)해 "가면 못 돌아오는 추천"을 막는다.
 
 ---
 
@@ -493,7 +494,7 @@ POST /resume → Command(resume={"decisions":[{advisory_id, option_id}]})
              → 정확히 interrupt() 지점부터 재개
 ```
 
-`after_review`가 선택된 옵션의 `action`을 보고 재계획 필요 여부를 판단한다. `keep`만 선택됐다면 `finalize`로 직행하고, `replace/reorder/drop/change_transport/shift_time/add_parking` 중 하나라도 있으면 `itinerary`로 되돌아간다.
+`after_review`가 선택된 옵션의 `action`을 보고 재계획 필요 여부를 판단한다. `keep`만 선택됐다면 `finalize`로 직행하고, `replace/reorder/drop/add_place/change_transport/shift_time/add_parking`(7종) 중 하나라도 있으면 `itinerary`로 되돌아간다.
 
 > ⚠️ **Python 3.11+ 필요.** LangGraph의 `interrupt()`는 async 노드에서 runnable config를 contextvar로 전파받는데, 이 전파가 `asyncio` 컨텍스트 인자에 의존한다(3.11+). 3.10에서는 async 노드의 interrupt가 동작하지 않는다. `pyproject.toml`에 `requires-python = ">=3.11"`로 못 박았다.
 
@@ -581,7 +582,7 @@ React Native의 `fetch`는 Chrome/Node와 달리 **응답 본문 스트리밍을
 ```
 POST /chat        → event: token / update / interrupt / done
 POST /chat/sync   → {"status":"interrupted", "interrupt":{...}}  또는
-                    {"status":"done", "answer":..., "itinerary":..., "evidence":[...]}
+                    {"status":"done", "answer":..., "itinerary":..., "evidence_ids":[...]}
 POST /resume      → 위와 동일 (Command(resume=...) 로 재개)
 ```
 
@@ -589,7 +590,7 @@ POST /resume      → 위와 동일 (Command(resume=...) 로 재개)
 
 ### 10.2 위치 — `gap_fill`의 입력
 
-`gap_fill`(일정 조기 종료) 라우트는 **현재 위치**가 없으면 성립하지 않는다. RN에서 `react-native-geolocation-service`로 얻은 좌표를 `TripConditions.origin`에 실어 보낸다.
+`gap_fill`(일정 조기 종료) 라우트는 **현재 위치**가 없으면 성립하지 않는다. 앱은 `expo-location`(`src/hooks/useCurrentLocation.ts`)으로 얻은 좌표를 `TripConditions.origin`에 실어 보낸다.
 
 ```jsonc
 POST /chat
@@ -602,7 +603,7 @@ POST /chat
 
 ### 10.3 지도
 
-네이버 지도는 RN용 공식 래퍼가 없어 커뮤니티 SDK(`react-native-nmap`) 또는 네이티브 모듈 브리지를 쓴다. 서버는 지도 SDK에 의존하지 않는다 — `Itinerary.map_path`(좌표 배열)와 `travel_min_from_prev`만 내려주고, 폴리라인 렌더링과 마커는 전적으로 클라이언트 책임이다. 지도 공급자를 교체해도 서버 계약은 그대로다.
+네이버 지도는 RN용 공식 래퍼가 없어 **WebView 안에 네이버 지도 JS SDK를 띄우는 방식**을 쓴다(`src/components/NaverMap.tsx`, 웹 빌드에서는 iframe 폴백). 서버는 지도 SDK에 의존하지 않는다 — `Itinerary.map_path`(좌표 배열)와 `travel_min_from_prev`만 내려주고, 폴리라인 렌더링과 마커는 전적으로 클라이언트 책임이다. 지도 공급자를 교체해도 서버 계약은 그대로다.
 
 ### 10.4 네이티브 기능이 채우는 요구사항
 
@@ -658,7 +659,7 @@ UI가 강제하는 설계 규칙 두 가지(`src/components/AdvisoryCard.tsx`):
 | 병렬 슈퍼스텝 | archive ∥ discovery, ctx 4종 ∥, 검증 6종 ∥ | 직렬 대비 왕복 수 1/3 |
 | `Send` 팬아웃 | facet 3~6, 후보 검증 N, 공백×카테고리 | 개수를 사전에 모르는 작업 |
 | 모델 분리 | 라우팅·요약·태깅 8B / 추론·판정 70B | 호출 빈도 × 단가 |
-| 검증 상한 | `CANDIDATE_POOL=60`, `VERIFY_CONCURRENCY=8` | 외부 API 쿼터 보호 |
+| 검증 상한 | `VERIFY_TOP_K=12` · `VERIFY_CONCURRENCY=8` (랭킹 풀은 `CANDIDATE_POOL=60`) | 외부 API 쿼터 보호 |
 | TTL 캐시 | geocode 24h · 경로/행렬 30m~1h · 날씨 15m~30m · 웹검색 15m | 동일 지역 반복 조회가 많음 |
 | 우아한 성능저하 | 모든 외부 호출 `safe_call`(타임아웃+기본값) | 도구 하나가 그래프를 멈추지 않게 |
 | 체크포인트 | PostgresSaver, thread_id = 대화 세션 | HITL 재개의 전제 |
@@ -716,7 +717,7 @@ UI가 강제하는 설계 규칙 두 가지(`src/components/AdvisoryCard.tsx`):
 | **경고가 만들어지지 않음** | 기획안의 핵심 화면(선제적 알림)이 도달 불가 | ✅ **UR-40** (2026-08-17) — `validation.check_friction` 이 `past_friction` 을 생산한다 |
 | 공공 API 정보 부실 | 상시 공간 추천 품질 저하 | `needs_check` 상태로 노출 + 웹검색 보강, 사용자 확인 후 스냅샷 축적 |
 | LLM 구조화 출력 실패 | 라우팅·판정 중단 | 전 지점 규칙 기반 폴백 (`router`, `plan_facets`, `extract_relevant`) |
-| 경고 피로 | 사용자가 카드를 무시 | `extract_relevant` 게이트 + severity 임계값, 카드 상한 5장 |
+| 경고 피로 | 사용자가 카드를 무시 | `extract_relevant` 게이트 + `auto_fixable`·severity 이중 조건(§8.1), 카드는 validation 한 곳에서만 생성 |
 | 한국어 lexical 회수율 | 하이브리드 절반이 무력화 | `pg_bigm`/PGroonga 교체 (변경점 1곳) |
 | 임베딩 모델 교체 | 인덱스 전면 재생성 | 원본(`visits`)과 파생(`experience_embeddings`) 분리, `UNIQUE(source_type, source_id)`로 재생성 멱등 |
 | 스케줄러 확장성 | 장소 10개+ 에서 greedy 품질 저하 | `schedule()` 단일 함수 교체(OR-Tools VRPTW) |
@@ -731,7 +732,7 @@ UI가 강제하는 설계 규칙 두 가지(`src/components/AdvisoryCard.tsx`):
 STEP 3(공유·커뮤니티)에 아래를 맞췄다.
 
 **Phase 1 (MVP, 현재)** — **7종 라우트, 4개 서브그래프**, HITL, 아카이브 하이브리드 검색,
-외부 API 6종 연동(문화포털·기상청·NCP Maps·OpenRouteService·ODsay·Tavily)
+외부 API 연동 9개 제공자(문화포털·기상청·NCP Maps·OpenRouteService·ODsay·Kakao Local(지오코딩 폴백)·NAVER 지역검색·Tavily·Exa(웹검색 폴백) — 진단 프로브 기준 11종)
 
 **Phase 1.5 — 2026-08-17 에 셋 다 닫혔다.** 기획안 대조에서 드러난 구멍이었고,
 셋 다 새 외부 의존 없이 끝났다.
@@ -803,6 +804,7 @@ culturemate/
 │   ├── llm/{provider,prompts}.py
 │   ├── tools/                 # http · base(캐시) · maps · routing · culture_api
 │   │                          # weather · websearch · verify · local_catalog
+│   │                          # kakao_local(지오코딩 폴백) · region(행정구역 필터)
 │   ├── db/{session,repo}.py
 │   └── api/{main,schemas}.py
 ├── db/001_schema.sql
@@ -812,12 +814,12 @@ culturemate/
 ├── scripts/render_graph.py    # 그래프 → Mermaid 덤프
 ├── tests/                     # 그래프 구조 · 아카이브 랭킹 · 스케줄 제약 · HITL 분기
 └── mobile/                    # React Native (Expo SDK 57)
-    ├── app/                   # expo-router: (tabs)/{index,curation,archive,report}, visit
-    │                          #   calendar 탭은 계획(UR-28) — 아직 없다
+    ├── app/                   # expo-router: (tabs)/{index,calendar,curation,archive,report}
+    │                          #   + visit · connect(서버 연결) · taste-cards(UR-01)
     └── src/
         ├── api/{client,mock,types}.ts   # SSE+sync 정규화 / 목 백엔드 / 서버 스키마 미러
         ├── components/                  # Timeline · AdvisoryCard · EvidenceSheet · NaverMap
-        │                                # PlaceFacts · TransportPicker · RoutePoints
+        │                                # PlaceFacts · TransportPicker · RoutePoints …
         ├── constants.ts                 # KIND_LABEL · FRICTION_LABEL (단일 원천)
         ├── hooks/useCultureMate.ts      # idle → running → awaiting_confirm → done
         └── store/storage.ts             # 오프라인 캐시 + 미동기화 기록 큐
