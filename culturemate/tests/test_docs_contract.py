@@ -86,7 +86,7 @@ def test_validation_runs_six_checks():
 
 # ------------------------------------------------------------- 라우팅 테이블
 def test_route_table_covers_every_request_type():
-    """8종 라우트가 전부 표에 있다 (ARCHITECTURE §5)."""
+    """7종 라우트가 전부 표에 있다 (ARCHITECTURE §5)."""
     from app.graph.router import ROUTE_TABLE
     from app.schemas import RequestType
 

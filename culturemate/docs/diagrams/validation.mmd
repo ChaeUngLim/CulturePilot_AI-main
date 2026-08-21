@@ -10,14 +10,17 @@ graph TD;
 	check_overlap(check_overlap)
 	check_weather(check_weather)
 	check_revisit(check_revisit)
+	check_friction(check_friction)
 	triage(triage)
 	build_confirm_cards(build_confirm_cards)
 	__end__([<p>__end__</p>]):::last
+	__start__ --> check_friction;
 	__start__ --> check_hours;
 	__start__ --> check_overlap;
 	__start__ --> check_revisit;
 	__start__ --> check_travel;
 	__start__ --> check_weather;
+	check_friction --> triage;
 	check_hours --> triage;
 	check_overlap --> triage;
 	check_revisit --> triage;

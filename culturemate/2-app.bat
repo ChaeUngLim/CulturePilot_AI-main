@@ -18,8 +18,8 @@ if not exist node_modules (
 )
 
 if not exist .env (
-  copy .env.example .env >nul
-  echo   Created .env from template.
+  echo # EXPO_PUBLIC_API_URL= > .env
+  echo   Created empty .env - mock mode. Fill EXPO_PUBLIC_API_URL to use a real server.
 )
 
 echo.
