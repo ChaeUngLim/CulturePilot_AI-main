@@ -97,6 +97,7 @@ docker exec culturemate python scripts/seed_demo.py
 | [STRUCTURE.md](STRUCTURE.md) | 요청 하나가 어떻게 흐르나 — 11단계 |
 | [REQUIREMENTS.md](REQUIREMENTS.md) | 무엇을 만들기로 했나 — FR · **UR 전량 추적표(§3.5)** |
 | [FUNCTIONAL_MAP.md](FUNCTIONAL_MAP.md) | 이 기능이 어느 파일에 있나 |
+| [UI.md](UI.md) | 참조 화면 23장(`PLANNING/`)을 어떻게 옮기나 · 선택지↔서버 필드 · 미지원 8건 |
 | [SETUP.md](SETUP.md) | 키 발급과 실행 |
 | [PROGRESS.md](PROGRESS.md) | 지금 무엇이 되고 무엇이 안 되나 |
 | [TEST.md](TEST.md) · [TEST_FUNCTIONAL.md](TEST_FUNCTIONAL.md) | 검증 결과 (지역별 / 전 구간) — **실행일 기준 기록이다** |

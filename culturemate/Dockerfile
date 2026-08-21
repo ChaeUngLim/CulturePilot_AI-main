@@ -27,6 +27,24 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app ./app
 COPY db ./db
 COPY scripts ./scripts
+
+# 컨테이너 안에서 `python -m pytest` 를 돌리기 위한 셋. 셋 다 있어야 한다 —
+#   pyproject.toml  pytest 설정(testpaths·asyncio_mode)이 여기 있다. 없으면
+#                   수집 범위가 달라진다.
+#   docs/*.md       test_docs_contract.py 가 문서를 직접 읽어 소스와 대조한다.
+#                   .md 만 넣는다 — docs 전체는 36MB(PLANNING 캡처·pptx·pdf)이고
+#                   테스트가 읽는 것은 .md 412KB 뿐이다.
+#   tests           본체.
+#
+# 이걸 이미지에 넣지 않던 동안에는 `docker cp` 로 밀어 넣어 썼다. 그런데 대상
+# 디렉터리가 이미 있으면 docker cp 는 그 **안으로** 복사한다 — `/srv/tests/tests`
+# 가 그렇게 생겼고, pytest 가 같은 테스트를 두 벌(388개) 수집했다. 게다가 사본은
+# `parents[1]` 이 한 단계 얕아져 `/srv/tests/docs/` 를 읽으려다 4건이 실패했다.
+# 실행 시간은 두 배가 되고 실패 4건은 매번 떴다.
+COPY pyproject.toml .
+COPY docs/*.md ./docs/
+COPY tests ./tests
+
 COPY docker-entrypoint-all.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint-all.sh
 

@@ -84,6 +84,7 @@ cd culturemate\mobile && npm start -- --web --port 19006
 | `culturemate/docs/STRUCTURE.md` | 요청 하나가 어떻게 흐르나 |
 | `culturemate/docs/REQUIREMENTS.md` | 무엇을 만들기로 했나 |
 | `culturemate/docs/FUNCTIONAL_MAP.md` | 이 기능이 어느 파일에 있나 |
+| `culturemate/docs/UI.md` | 참조 화면 23장을 어떻게 옮기나 · 선택지↔서버 필드 (`app/ui.py`) |
 | `culturemate/docs/SETUP.md` | 키 발급과 실행 |
 | `culturemate/docs/PROGRESS.md` | 지금 무엇이 되고 무엇이 안 되나 |
 | `culturemate/docs/TEST.md` | 검증 결과 · 결함 · 신규 UR |
