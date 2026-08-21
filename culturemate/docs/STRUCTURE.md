@@ -718,6 +718,7 @@ app/
   tools/                 외부 API (12장 표) · region.py(시·도 판정, UR-18)
   db/                    repo.py(질의) · session.py(풀)
   llm/                   provider.py · prompts.py
+  ui.py                  화면 명세 (UR-41) — 그래프 밖. 렌더는 mobile/ 이다
 
 mobile/
   app/(tabs)/            index(오늘의 일정) · calendar(UR-28) · curation · archive · report
@@ -732,28 +733,33 @@ mobile/
     config.ts                  apiUrl() · isMock() — 런타임에 바뀐다(연결 화면)
     store/storage.ts           오프라인 캐시 + 저장된 서버 주소
     constants.ts               KIND_LABEL · FRICTION_LABEL (단일 원천)
-    theme.ts                   색·간격 토큰
+    theme.ts                   색·간격 토큰 (app/ui.py 의 COLORS 가 이 값의 사본이다)
   scripts/               verify-flow.mjs(계약 검증 17항목) · start-tunnel.mjs
 
 db/001_schema.sql        사용자 · 장소 · 방문 · 경험임베딩 · 취향집계 · 컬렉션
 scripts/                 seed_demo · generate_catalog(+_catalog_data) · check_apis
                          bench_models · render_graph · find_culture_api
 docs/                    ARCHITECTURE(왜) · STRUCTURE(어떻게) · REQUIREMENTS(무엇을)
-                         FUNCTIONAL_MAP(어디에) · PLANNING(기획안 대조) · SETUP · PROGRESS
+                         FUNCTIONAL_MAP(어디에) · UI(화면) · PLANNING(기획안 대조)
+                         SETUP · PROGRESS
                          TEST · TEST_FUNCTIONAL · HANDOFF
                          AGENT_ROLES · AGENT_WORKFLOW · SYSTEM_C4 · diagrams/
 tests/                   194개 (193 passed · 1 skipped)
   test_docs_contract.py  문서 ↔ 소스 정합성을 고정 (노드·라우트·라우팅 표·HITL 조건)
 ```
 
-`tests/` 는 런타임 이미지에 들어가지 않는다(`Dockerfile` 은 `app`·`db`·`scripts` 만 복사).
-컨테이너에서 돌리려면 붙여 준다:
+`tests/` · `docs/*.md` · `pyproject.toml` 은 **이미지에 들어 있다**(2026-08-21).
+그대로 돌린다:
 
 ```
-docker compose run --rm --no-deps \
-  -v "$PWD/tests:/srv/tests" -v "$PWD/pyproject.toml:/srv/pyproject.toml" \
-  api python -m pytest -q
+docker exec culturemate python -m pytest -q
 ```
+
+예전에는 이미지에 없어서 `docker cp` 로 밀어 넣어 썼다. 그런데 대상 디렉터리가
+이미 있으면 `docker cp` 는 그 **안으로** 복사한다 — `/srv/tests/tests` 가 그렇게
+생겨 pytest 가 같은 테스트를 두 벌(388개) 수집했고, 사본은 `parents[1]` 이 한 단계
+얕아져 없는 `/srv/tests/docs/` 를 읽으려다 4건이 매번 실패했다. `docs` 는 `.md` 만
+넣는다 — 폴더 전체는 36MB(PLANNING 캡처·pptx·pdf)이고 테스트가 읽는 것은 412KB다.
 
 ---
 

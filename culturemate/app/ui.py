@@ -133,6 +133,19 @@ CATALOG_CATEGORIES: tuple[str, ...] = (
 
 # ════════════════════════════════════════════════════════ 3. 명세 모델
 
+#: 인증 상태.
+#:
+#: ⚠ **이 앱에는 인증이 없다.** `user_id` 는 클라이언트가 보내는 문자열이고,
+#: 모바일에서는 빌드 상수 하나다(`EXPO_PUBLIC_USER_ID` → `00000000-…-0001`).
+#: 설치본 전부가 같은 사용자이고, 서버는 그 값을 그대로 믿는다.
+#:
+#: 그래서 아래 §7 의 로그인 게이트는 **화면 차원의 전환 유도**이지 접근 통제가
+#: 아니다. 게이트를 세워도 `GET /plans/{user_id}` 는 여전히 누구나 부를 수 있다.
+#: 이 구분을 흐리면 '로그인을 붙였으니 데이터가 보호된다'고 읽히게 된다.
+AuthState = Literal["anonymous", "member"]
+
+AUTH_LABEL: dict[str, str] = {"anonymous": "비회원", "member": "회원"}
+
 StepKind = Literal[
     "single",    # 하나만 고른다 (칩)
     "multi",     # 여러 개 고른다 (칩)
@@ -182,6 +195,9 @@ class Screen(BaseModel):
     #: 이 화면이 부르는 엔드포인트.
     api: list[str] = Field(default_factory=list)
     steps: list[Step] = Field(default_factory=list)
+    #: 이 화면을 **열기** 위해 필요한 최소 상태. 화면 안의 개별 상호작용에 거는
+    #: 조건은 여기가 아니라 `Gate` 다(결과 화면은 비회원도 보되, 세부 확인만 막는다).
+    requires_auth: AuthState = "anonymous"
     note: str | None = None
 
 
@@ -193,7 +209,64 @@ class Flow(BaseModel):
     screens: list[Screen] = Field(default_factory=list)
 
 
+class Gate(BaseModel):
+    """특정 **상호작용**에서 뜨는 로그인 요구.
+
+    화면 전체를 막는 것(`Screen.requires_auth`)과 다르다. 최종 일정은 비회원도
+    보여 주되 세부 확인에서만 로그인을 요구하는 식이라, 막는 단위가 화면이 아니라
+    «무엇을 눌렀는가»다.
+
+    `resume` 이 있는 이유 — 로그인 뒤에 홈으로 떨어뜨리면 사용자는 방금 누른 것을
+    다시 찾아 들어가야 한다. 게이트를 세운 목적(그 세부를 보고 싶다)이 로그인
+    성공 시점에 사라지는 셈이다.
+    """
+
+    id: str
+    title: str
+    message: str
+    #: 이 상호작용에서 뜬다.
+    triggers: list[str]
+    #: 어느 화면 안에서. `flow/screen` 형식.
+    screen: str
+    requires: AuthState = "member"
+    #: 로그인 성공 후 돌아갈 곳. `flow/screen` 형식.
+    resume: str
+    supported: bool = False
+    note: str | None = None
+
+
 # ════════════════════════════════════════════════════════ 4. 선택지 묶음
+
+#: 앱을 처음 열었을 때의 갈림길. 온보딩·AI 추천·직접 만들기 **앞에** 선다.
+START_CHOICES: list[Choice] = [
+    Choice(
+        id="anonymous", label="비회원으로 시작하기", glyph="→",
+        writes={},
+        note="지금도 되는 길이다. 다만 «비회원»이 아니라 «빌드 전체가 한 사람»인 "
+             "상태다 — user_id 가 EXPO_PUBLIC_USER_ID 빌드 상수라 모든 설치본이 "
+             "00000000-…-0001 을 쓴다. 기기마다 uuid 를 만들어 저장하도록 "
+             "config.ts 를 고쳐야 «비회원 각자»가 된다.",
+    ),
+    Choice(
+        id="member", label="회원으로 시작하기", glyph="◉",
+        writes={}, supported=False,
+        note="로그인이 없다. users 테이블에 email·display_name 은 있으나 "
+             "자격증명 컬럼이 없고, 엔드포인트 23개 중 인증은 0개다.",
+    ),
+]
+
+#: 로그인 화면의 수단. 전부 미지원이라 «무엇을 만들어야 하는가»의 목록이다.
+LOGIN_METHODS: list[Choice] = [
+    Choice(id="email", label="이메일로 로그인", writes={}, supported=False,
+           note="users.email 은 이미 UNIQUE 다. 비밀번호 해시 컬럼과 "
+                "POST /auth/login · /auth/signup 이 필요하다."),
+    Choice(id="kakao", label="카카오로 계속하기", writes={}, supported=False,
+           note="카카오 키는 이미 쓴다(kakao_local). 다만 그건 REST API 키이고 "
+                "로그인은 별도 앱 등록·OAuth 리다이렉트가 필요하다."),
+    Choice(id="guest", label="다음에 하기", writes={}, supported=True,
+           note="게이트를 닫고 비회원 상태로 되돌린다. 이 길이 없으면 세부를 한 번 "
+                "누른 사용자가 앱에서 빠져나갈 방법이 로그인뿐이 된다."),
+]
 
 #: 「1.첫 실행 화면 취향 선호도」 — 이 여행은 어떤 주제여야 하나요?
 #: kind_quota 의 키는 `schemas.KIND_GROUPS` 의 그룹명이다(PlaceKind 가 아니다).
@@ -382,10 +455,118 @@ ENDPOINTS: list[tuple[str, str, str]] = [
 
 # ════════════════════════════════════════════════════════ 7. 흐름
 
+FLOW_AUTH = Flow(
+    id="auth",
+    title="시작 · 로그인",
+    entry="앱 최초 실행 · 게이트에서 올라옴",
+    screens=[
+        Screen(
+            id="start",
+            title="시작하기",
+            route="",
+            note="온보딩·AI 추천·직접 만들기 셋 다 이 화면 뒤에 온다. "
+                 "비회원을 고르면 곧장 온보딩(auth/start → onboarding/taste)으로 "
+                 "간다 — 여기서 한 번 더 묻지 않는다.",
+            steps=[
+                Step(id="mode", title="어떻게 시작할까요?", kind="single",
+                     subtitle="비회원으로도 일정을 만들 수 있어요. "
+                              "저장하려면 로그인이 필요합니다.",
+                     choices=START_CHOICES),
+            ],
+        ),
+        Screen(
+            id="login",
+            title="로그인",
+            route="",
+            note="게이트에서 올라오는 경우가 많다. 그때는 Gate.resume 으로 "
+                 "되돌아가야 한다.",
+            steps=[
+                Step(id="method", title="로그인", kind="single",
+                     choices=LOGIN_METHODS),
+            ],
+        ),
+        Screen(
+            id="migrate",
+            title="비회원 기록 이어받기",
+            route="",
+            requires_auth="member",
+            note="비회원으로 온보딩·일정 생성을 마친 뒤 로그인하면, 익명 uuid 에 "
+                 "쌓인 것(preference_cards · plans · visits · taste_profiles · "
+                 "user_collections)을 계정 uuid 로 옮겨야 한다. 옮기지 않으면 "
+                 "방금 12장을 넘긴 취향 카드가 로그인하는 순간 사라진다 — "
+                 "가입 직후 이탈을 만드는 가장 확실한 방법이다.",
+            steps=[
+                Step(id="confirm", title="지금까지 만든 일정을 계정으로 옮길까요?",
+                     kind="single",
+                     choices=[
+                         Choice(id="merge", label="옮기기", writes={}, supported=False,
+                                note="POST /auth/merge 같은 엔드포인트가 없다. "
+                                     "user_id 를 가진 테이블 8개를 한 트랜잭션에서 "
+                                     "옮겨야 한다."),
+                         Choice(id="discard", label="새로 시작하기", writes={},
+                                supported=False,
+                                note="익명 uuid 를 버린다. 이 길도 명시적으로 두어야 "
+                                     "한다 — 남의 기기를 잠깐 빌려 쓴 경우 앞사람의 "
+                                     "취향이 내 계정에 붙는 것이 더 나쁘다."),
+                     ]),
+            ],
+        ),
+    ],
+)
+
+#: 로그인 게이트. **화면이 아니라 상호작용**에 건다.
+#:
+#: 결과 화면 자체는 비회원도 본다 — 일정을 만들어 보여 주는 것이 이 앱이 처음
+#: 증명해야 하는 가치라, 그 앞에 로그인을 세우면 아무것도 못 보고 이탈한다.
+#: 대신 «세부를 더 파고드는» 지점에서 요구한다.
+GATES: list[Gate] = [
+    Gate(
+        id="map_detail",
+        title="지도 세부 일정",
+        message="이 장소의 세부를 보려면 로그인이 필요해요.",
+        triggers=[
+            "지도의 번호 핀 탭",
+            "타임라인 카드 탭 (장소 상세 열기)",
+            "«길찾기» · 구간 거리 펼치기",
+        ],
+        screen="onboarding/result",
+        resume="onboarding/result",
+        note="탭 대상은 ItineraryItem 이다. 지금 이 상호작용은 "
+             "mobile/app/(tabs)/index.tsx · NaverMap.tsx · Timeline.tsx 에 "
+             "이미 있고 아무것도 묻지 않는다.",
+    ),
+    Gate(
+        id="day_detail",
+        title="Day 세부 일정",
+        message="Day 별 일정을 확인하려면 로그인이 필요해요.",
+        triggers=[
+            "day 1 / day 2 헤더 탭",
+            "«편집» 탭",
+            "일정 카드에서 장소 상세 열기",
+        ],
+        screen="manual_plan/detail",
+        resume="manual_plan/detail",
+        note="AI 흐름의 ai_plan/detail 에도 같은 게이트가 필요하다. 두 화면이 "
+             "같은 컴포넌트를 쓰면 게이트도 한 곳에서 걸린다.",
+    ),
+    Gate(
+        id="save_plan",
+        title="일정 저장",
+        message="만든 일정을 저장하려면 로그인이 필요해요.",
+        triggers=["«내 일정으로 담기» 탭"],
+        screen="ai_plan/proposal",
+        resume="ai_plan/proposal",
+        note="세부 확인보다 이쪽이 로그인을 요구할 명분이 뚜렷하다 — "
+             "«저장»은 다음에 다시 열겠다는 뜻이라 계정이 실제로 필요하다. "
+             "세부 확인 게이트만 세우고 이걸 빠뜨리면, 비회원이 저장까지 하고 "
+             "다음 실행에서 아무것도 못 찾는다.",
+    ),
+]
+
 FLOW_ONBOARDING = Flow(
     id="onboarding",
     title="첫 실행 · 비로그인 카드 선택",
-    entry="앱 최초 실행 (아카이브 0건)",
+    entry="auth/start 에서 «비회원으로 시작하기» (아카이브 0건)",
     screens=[
         Screen(
             id="taste",
@@ -621,7 +802,7 @@ FLOW_MANUAL_PLAN = Flow(
     ],
 )
 
-FLOWS: list[Flow] = [FLOW_ONBOARDING, FLOW_AI_PLAN, FLOW_MANUAL_PLAN]
+FLOWS: list[Flow] = [FLOW_AUTH, FLOW_ONBOARDING, FLOW_AI_PLAN, FLOW_MANUAL_PLAN]
 
 
 # ════════════════════════════════════════════════════════ 8. 내보내기 · 검증
@@ -645,7 +826,9 @@ def spec() -> dict[str, Any]:
             "kind": KIND_LABEL,
             "friction": FRICTION_LABEL,
             "verdict": VERDICT_LABEL,
+            "auth": AUTH_LABEL,
         },
+        "gates": [g.model_dump() for g in GATES],
         "progress": {
             "stages": [{"node": n, "label": label} for n, label in PROGRESS_STAGES],
             "note": PROGRESS_NOTE,
@@ -723,6 +906,21 @@ def validate() -> list[str]:
             problems.append(
                 f"labels[{field}]: 라벨 {sorted(table)} ≠ Literal {sorted(allowed)}")
 
+    # 게이트가 가리키는 화면이 실제로 있는가. 오타 하나면 로그인 뒤에 아무 데도
+    # 돌아가지 못하는 막다른 길이 된다 — 화면에서는 «로그인은 됐는데 아무 일도
+    # 안 일어난다»로 보인다.
+    known = {f"{f.id}/{s.id}" for f in FLOWS for s in f.screens}
+    for gate in GATES:
+        for field in ("screen", "resume"):
+            ref = getattr(gate, field)
+            if ref not in known:
+                problems.append(f"gate[{gate.id}].{field}: «{ref}» 화면이 없다")
+        if not gate.triggers:
+            problems.append(f"gate[{gate.id}]: triggers 가 비었다 — 언제 뜨는지 알 수 없다")
+
+    if set(AUTH_LABEL) != set(get_args(AuthState)):
+        problems.append(f"labels[auth]: 라벨 {sorted(AUTH_LABEL)} ≠ AuthState")
+
     # 선택지 id 는 화면 안에서 유일해야 한다. 겹치면 뒤엣것이 앞엣것을 덮어쓴다.
     for flow in FLOWS:
         for screen in flow.screens:
@@ -750,4 +948,9 @@ if __name__ == "__main__":  # pragma: no cover
     print(f"\n미지원 선택지 {len(unsupported)}건 (지우지 않고 남겨 둔 것):")
     for path, choice in unsupported:
         print(f"  - {path}: {choice.label} — {choice.note}")
+
+    print(f"\n로그인 게이트 {len(GATES)}건 — 전부 화면 차원이다(인증 없음):")
+    for gate in GATES:
+        mark = "✔" if gate.supported else "✗"
+        print(f"  {mark} {gate.id} @ {gate.screen} ← {' · '.join(gate.triggers)}")
     print(f"\n명세 크기: {len(json.dumps(spec(), ensure_ascii=False))} bytes")

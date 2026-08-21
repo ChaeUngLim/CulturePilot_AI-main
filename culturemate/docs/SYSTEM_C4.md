@@ -173,6 +173,7 @@ graph TD
 | 체크포인트 | `checkpoints` · `checkpoint_blobs` · `checkpoint_writes` | 그래프 |
 
 - **벡터 인덱스** — HNSW `m=16, ef_construction=64`, cosine. `vector(1024)` 는 `EMBED_DIM=1024` 와 **짝으로 고정**이다. 모델을 바꾸려면 스키마와 기존 임베딩을 함께 재생성해야 한다.
+- **사용자 식별은 없다(UR-42).** `users` 테이블은 있으나 자격증명 컬럼이 없고, 엔드포인트 23개 중 인증은 0개다. `user_id` 는 요청 본문·경로로 들어오는 값을 그대로 신뢰한다. 아래 `ON DELETE CASCADE` 는 **데이터 소유 경계**를 지키는 장치이지 접근 통제가 아니다 — 둘을 같은 것으로 읽으면 «개인정보가 보호된다»는 잘못된 결론이 나온다. 명세는 [UI.md §2.0](UI.md).
 - **개인정보 통제(UR-17)** — `users` 를 참조하는 모든 테이블에 `ON DELETE CASCADE`. 단 `place_snapshots` 는 `users` FK 자체가 없다 — 공식정보 스냅샷은 개인정보가 아니라 사실 기록이므로, 사용자를 지워도 다른 사용자의 검증 근거로 남는다. (`SET NULL` 은 `visits.plan_id` · `experience_embeddings.place_id` 두 곳에 쓰였다.)
 
 ---

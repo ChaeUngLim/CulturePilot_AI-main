@@ -4,7 +4,7 @@
 > 지금 무엇이 되고 있고, 빈 환경에서 어떻게 되살리며, 다음에 무엇부터 손대면 되는지만 적는다.
 > 왜 그렇게 설계했는지는 [ARCHITECTURE.md](ARCHITECTURE.md), 지금 상태의 전량은 [PROGRESS.md](PROGRESS.md).
 
-최종 갱신: **2026-08-18** (문서 정합성 정리 · 설계서 3종 신규 작성)
+최종 갱신: **2026-08-21** (화면 명세 `app/ui.py` · `UI.md` 신규 · 문서 정합성 재정정)
 
 ---
 
@@ -13,11 +13,13 @@
 **전 구간이 실제 데이터로 동작한다.** 외부 API **11종** 연결, 컨테이너 1개로 기동,
 일정 생성 → 지도 경로 → HITL 확인 카드 → 재계획까지 앱에서 완주한다.
 **기획안이 약속한 핵심 기능 중 미구현으로 남은 것은 없다.**
+다만 **사용자를 구분하는 수단이 없다** — 인증 0개 · `user_id` 는 클라이언트 값을
+그대로 믿는다 ([PLANNING.md §8-6](PLANNING.md) · [UI.md §2.0](UI.md)).
 
 ```
 그래프    11 노드 (서브그래프 4 + 조율 7) · 라우트 7종 · 검증 6종
 API       엔드포인트 23개
-소스      백엔드 Python 10,657줄(55파일) · 모바일 TS 6,542줄
+소스      백엔드 Python 11,613줄(56파일) · 모바일 TS 6,542줄
 테스트    194개 (193 passed · 1 skipped) · ruff All checks passed
 DB        places 2,092 · visits 32 · embeddings 32 · plan_edits 13
 응답      중앙값 5.1초 (NFR-01 목표 15초)
@@ -97,7 +99,7 @@ docker exec culturemate python scripts/seed_demo.py
 | [STRUCTURE.md](STRUCTURE.md) | 요청 하나가 어떻게 흐르나 — 11단계 |
 | [REQUIREMENTS.md](REQUIREMENTS.md) | 무엇을 만들기로 했나 — FR · **UR 전량 추적표(§3.5)** |
 | [FUNCTIONAL_MAP.md](FUNCTIONAL_MAP.md) | 이 기능이 어느 파일에 있나 |
-| [UI.md](UI.md) | 참조 화면 23장(`PLANNING/`)을 어떻게 옮기나 · 선택지↔서버 필드 · 미지원 8건 |
+| [UI.md](UI.md) | 참조 화면 23장(`PLANNING/`)을 어떻게 옮기나 · 선택지↔서버 필드 · 로그인 게이트 · 미지원 13건 |
 | [SETUP.md](SETUP.md) | 키 발급과 실행 |
 | [PROGRESS.md](PROGRESS.md) | 지금 무엇이 되고 무엇이 안 되나 |
 | [TEST.md](TEST.md) · [TEST_FUNCTIONAL.md](TEST_FUNCTIONAL.md) | 검증 결과 (지역별 / 전 구간) — **실행일 기준 기록이다** |
@@ -117,6 +119,7 @@ docker exec culturemate python scripts/seed_demo.py
 | 2 | **같은 시·도 안의 거리 감점** | 시·도 판정으로 «다른 지역»은 닫혔지만 서울 안 강서구↔강동구처럼 한 구간이 지나치게 먼 경우는 그대로다 |
 | 3 | **UR-30 저장 목록 → 일정 만들기** | `user_collections` 는 있고 일정 생성 경로만 없다 |
 | 4 | **UR-32 기록 자동 유도** | `POST /visits` · `app/visit.tsx` 는 있으나 자동으로 뜨지 않는다. 캘린더가 진입점 |
+| 5 | **UR-42 기기별 익명 uuid** | `mobile/src/config.ts:6` 이 빌드 상수라 **설치본 전부가 같은 사용자**다. 첫 실행에 uuid 를 만들어 `store/storage.ts` 에 저장하면 인증 없이도 «비회원 각자»가 된다 |
 
 ### 4.2 품질·운영
 
@@ -147,5 +150,5 @@ data.go.kr · OpenAI · KCISA · NVIDIA · OpenRouteService(ORS)
 ## 6. 알아 둘 상태
 
 - **`test_docs_contract.py` 는 «셀 수 있는 것»만 지킨다.** 노드 **집합**과 `set(ROUTE_TABLE) == set(RequestType)` 을 볼 뿐, 문서의 «6종»·«11 노드» 같은 **숫자 문장은 읽지 않는다.** 숫자를 고칠 때는 `build.py` 의 `add_node` 호출을 직접 센다.
-- **문서 정합성은 2026-08-18 에 한 번 훑었다.** 테스트 수·줄 수·검증 종류·리듀서 목록·실행 경로·기획안 대조표를 소스와 맞췄다. 그 뒤 코드가 바뀌었다면 같은 항목부터 의심한다.
+- **문서 정합성은 2026-08-18 · 2026-08-21 두 번 훑었다.** 테스트 수·줄 수·검증 종류·리듀서 목록·실행 경로·기획안 대조표를 소스와 맞췄다. 2026-08-21 에는 `app/ui.py` 추가로 규모 수치(10,657→11,613줄 · 55→56파일)와, Dockerfile 이 `tests`·`docs/*.md`·`pyproject.toml` 을 담게 되면서 무효가 된 STRUCTURE §15 의 마운트 안내를 고쳤다. 그 뒤 코드가 바뀌었다면 같은 항목부터 의심한다.
 - **`.env` 의 `MODEL_ROUTER`·`MODEL_PLANNER`·`MODEL_WRITER`·`MODEL_FAST` 는 2026-08-18 에 «역할별 혼합 배선»([REQUIREMENTS §5.3](REQUIREMENTS.md))으로 채워졌다.** 새 환경을 만들면 이 네 칸이 다시 비고, 그러면 네 역할 모두 `LLM_BACKEND=nim` 기본값으로 가 planner·writer 가 70B 로 잡혀 응답이 늘어진다. 응답 품질·시간을 재기 전에 이 값부터 확인한다.

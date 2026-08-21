@@ -53,11 +53,15 @@ DB        places 2,092 · visits 32 · embeddings 32 · plan_edits 13
 | **UR-18** | **행정구역 기반 지역 필터** | ✅ `tools/region.py` → `discovery.normalize` 가 다른 시·도를 제외 |
 
 제외: UR-12 · UR-16 — [FUNCTIONAL_MAP.md §7](FUNCTIONAL_MAP.md)
-기획안 대조로 추가된 UR-29~UR-39 는 [REQUIREMENTS.md §3.5](REQUIREMENTS.md) 에 상태와 함께 있다.
+기획안 대조로 추가된 UR-29~UR-43 는 [REQUIREMENTS.md §3.5](REQUIREMENTS.md) 에 상태와 함께 있다.
 
-**규모(2026-08-17 소스 재확인)** — 메인 그래프 **11 노드**(서브그래프 4 + 조율 7) ·
-라우트 **7종** · 엔드포인트 **23개** · 검증 **6종**. 문서 여러 곳이 12노드·5서브그래프·8라우트로 남아 있어
-같은 날 정정했다. 계약 테스트는 **집합**만 보고 숫자 문장은 읽지 않으므로 통과하고 있었다.
+**규모(2026-08-21 소스 재확인)** — 메인 그래프 **11 노드**(서브그래프 4 + 조율 7) ·
+라우트 **7종** · 엔드포인트 **23개** · 검증 **6종** ·
+백엔드 Python **11,613줄**(56파일, `app/ui.py` 956줄 포함).
+
+그래프 수치는 2026-08-17 에 정정한 것이다 — 문서 여러 곳이 12노드·5서브그래프·8라우트로
+남아 있었다. 계약 테스트는 **집합**만 보고 숫자 문장은 읽지 않으므로 통과하고 있었다.
+줄 수·파일 수는 2026-08-21 에 `app/ui.py` 를 더하며 다시 셌다.
 
 ---
 
@@ -69,6 +73,15 @@ DB        places 2,092 · visits 32 · embeddings 32 · plan_edits 13
       `personal_score` 가 0.5 로 고정되던 문제. `repo.save_preference_cards` ·
       `profile.apply_preference_cards` · `mobile/app/taste-cards.tsx`.
       새 필드 없이 기존 두 필드로 접었다 — 상세는 [FUNCTIONAL_MAP §2 UR-01](FUNCTIONAL_MAP.md).
+
+- [ ] **UR-42 사용자를 구분하지 못한다.** 인증이 없다 — 엔드포인트 23개 중 0개,
+      `users` 에 자격증명 컬럼 없음, `user_id` 는 클라이언트가 보내는 값을 그대로 믿는다.
+      모바일은 `EXPO_PUBLIC_USER_ID` **빌드 상수**라 설치본 전부가 같은 사람이다
+      (`mobile/src/config.ts:6`). **개인화가 이 서비스의 전제인데 그 전제가 데모에서만
+      성립한다** — [PLANNING §8-6](PLANNING.md) · [UI.md §2.0](UI.md).
+      먼저 손댈 것은 인증이 아니라 **기기별 익명 uuid** 다. 그것만으로 «비회원 각자»가 된다.
+- [ ] **UR-43 비회원 기록 이어받기.** 로그인을 붙이는 순간 필요해진다. 안 옮기면
+      온보딩에서 넘긴 취향 카드가 로그인하는 순간 사라진다. 테이블 8개 · 한 트랜잭션.
 
 ### 우선순위 2 — 품질
 
@@ -167,6 +180,7 @@ docker exec culturemate psql -U culturemate -d culturemate -c "TRUNCATE checkpoi
 
 | 문서 | 역할 |
 |---|---|
+| [UI.md](UI.md) | 참조 화면 23장을 어떻게 옮기나 · 선택지↔서버 필드 · 로그인 게이트 |
 | [HANDOFF.md](HANDOFF.md) | **세션 인계** — 다른 로그인에서 이어갈 때 먼저 읽는다 (지금 상태 · 환경 복원 · 다음 착수 지점) |
 | [PLANNING.md](PLANNING.md) | **기획안이 무엇을 약속했나** — MOBIDIC 기획안 원문 정리 + 구현 대조표 |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | 왜 이렇게 설계했나 — 그래프 토폴로지·State·리듀서·HITL·DB |
