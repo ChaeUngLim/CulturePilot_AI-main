@@ -310,12 +310,120 @@ EXPO_PUBLIC_API_URL=http://localhost:8000
 EXPO_PUBLIC_USER_ID=00000000-0000-0000-0000-000000000001
 ```
 
-> 폰에서 볼 때만 PC의 LAN IP(`ipconfig` 의 IPv4)로 바꿉니다. 다시 빌드하기 싫으면
-> 앱 안에서 바꿔도 됩니다 — 헤더 오른쪽의 «● 연결됨 / ● 목 모드» 를 누르면
-> **서버 연결** 화면이 열리고, 거기서 주소를 넣고 «연결 테스트» 로 확인한 뒤
-> 저장하면 그 값이 `.env` 보다 우선합니다.
+> 위 주소는 **PC 웹 브라우저 전용**입니다. 폰에서 열려면 §3.1 을 보세요.
 > `EXPO_PUBLIC_USER_ID` 는 **UUID여야 합니다** — 아니면 방문 기록 저장이
 > 외래키 제약으로 실패합니다.
+
+### 3.1 폰(Expo Go)에서 실행 — 같은 Wi-Fi
+
+**공유기 관리자 로그인도, 포트포워딩도 필요 없습니다.** 폰이 PC와 같은 Wi-Fi 에
+붙어 있기만 하면 됩니다. 같은 랜 안에서 서로 부르는 것이지 외부에 여는 게 아닙니다.
+
+**① PC 의 LAN IP 를 확인합니다.**
+
+```bat
+ipconfig
+```
+
+`IPv4 주소` 중 `192.168.x.x` 또는 `10.x.x.x` 로 시작하는 것을 씁니다.
+`172.x` 로 시작하는 것은 Docker·WSL 가상 어댑터라 **폰에서 못 닿습니다** — 고르지 마세요.
+어댑터가 여럿이면 폰이 붙은 Wi-Fi 와 **앞 세 자리가 같은** 것을 고릅니다
+(폰 IP 가 `192.168.10.x` 면 PC 도 `192.168.10.x`).
+
+**② `culturemate\mobile\.env` 를 그 주소로 바꿉니다.**
+
+```ini
+EXPO_PUBLIC_API_URL=http://192.168.10.21:8000
+#EXPO_PUBLIC_API_URL=http://localhost:8000   # PC 웹 브라우저용
+```
+
+`localhost` 를 그대로 두면 **앱은 뜨는데 API 만 전부 실패**합니다. 폰 입장에서
+`localhost` 는 PC 가 아니라 폰 자신이기 때문입니다.
+
+**③ 앱을 띄웁니다.** 포트를 지정하는 이유는 아래 표 참고.
+
+```bat
+cd /d C:\Users\31\Documents\CulturePilot_AI-main\culturemate\mobile
+npx expo start --port 19000
+```
+
+**④ 폰의 Expo Go 로 QR 을 스캔합니다.**
+
+#### 폰에서 「Checking for new update…」에서 멈춘다면
+
+게이지가 안 올라가면 **번들을 못 받고 있는 것**입니다. 순서대로 봅니다.
+
+1. **cmd 창이 살아 있나.** 「계속하려면 아무 키나 누르십시오」가 보이면 그건
+   `.bat` 의 `pause` 이고, **Metro 는 이미 종료된 상태**입니다. 번들이 99% 에서
+   멈춘 게 아니라 거기서 죽은 겁니다.
+2. **폰 브라우저로 `http://<PC IP>:8000/health` 를 열어 봅니다.**
+   JSON 이 보이면 백엔드까지 닿는 것이고, 안 열리면 방화벽입니다(아래).
+3. **폰과 PC 가 같은 Wi-Fi 인지.** 5GHz/2.4GHz 를 다른 SSID 로 쓰는 공유기면
+   갈릴 수 있습니다. 게스트 네트워크는 기기 간 통신이 막혀 있어 안 됩니다.
+
+#### Windows 방화벽
+
+기본 인바운드 정책이 차단이라 처음 실행할 때 **「Windows 보안 경고」** 창이 뜹니다.
+**「액세스 허용」을 누르면** 규칙이 자동으로 만들어집니다. 실수로 「취소」를 눌렀거나
+창이 안 떴다면, **관리자 권한 cmd** 에서 직접 엽니다.
+
+```bat
+netsh advfirewall firewall add rule name="CultureMate API 8000" dir=in action=allow protocol=TCP localport=8000
+netsh advfirewall firewall add rule name="CultureMate Expo 19000" dir=in action=allow protocol=TCP localport=19000
+```
+
+#### 포트를 지정하는 이유
+
+| 포트 | 무엇 | 비고 |
+|---|---|---|
+| 8000 | 백엔드 | 도커가 `0.0.0.0` 으로 공개하므로 LAN 에서 보입니다 |
+| 19000 | Expo (권장) | |
+| 8081 | Expo 기본값 | **피하는 편이 낫습니다.** 일부 Windows 환경에서 예약 포트 구간(8075~8174)에 걸려 `Port 8081 is reserved by the OS` 로 죽습니다 |
+
+#### 다른 망이거나 방화벽을 못 여는 경우 — 터널
+
+```bat
+cd /d C:\Users\31\Documents\CulturePilot_AI-main\culturemate
+앱실행-터널.bat
+```
+
+`cloudflared` 로 백엔드를 외부 주소로 열고, 그 주소를 `.env` 에 **자동으로** 써넣은 뒤
+`expo start --tunnel` 을 실행합니다(`mobile/scripts/start-tunnel.mjs`).
+터널 주소는 실행할 때마다 바뀌므로 손으로 옮겨 적지 마세요.
+`cloudflared` 가 없으면 `winget install --id Cloudflare.cloudflared`.
+
+#### 어댑터가 여러 개인 PC — `hostUri` 가 `127.0.0.1` 로 나가는 문제
+
+폰이 「Checking for new update…」에서 멈추는 원인 중 **가장 찾기 어려운 것**입니다.
+Expo 는 매니페스트에 «번들을 어디서 받아라»를 적어 보내는데, 랜카드가 많으면
+(유선·무선·WSL·Bluetooth·169.254 자동할당) 주소를 못 고르고 `127.0.0.1` 을 적습니다.
+폰 입장에서 그건 **폰 자신**이라 영원히 못 받습니다. 접속은 되는데 게이지가 안 올라갑니다.
+
+확인:
+
+```bat
+curl -H "Expo-Platform: android" -H "Accept: application/expo+json,application/json" http://localhost:19000
+```
+
+응답의 `hostUri` 가 `127.0.0.1` 이면 이 경우입니다. **호스트명을 직접 박아** 띄웁니다.
+
+```bat
+set REACT_NATIVE_PACKAGER_HOSTNAME=192.168.10.21
+npx expo start --host lan --port 19000
+```
+
+#### `.env` 를 안 고치고 앱 안에서 바꾸기
+
+헤더 오른쪽의 «● 연결됨 / ● 목 모드» 를 누르면 **서버 연결** 화면이 열립니다.
+주소를 넣고 «연결 테스트» 로 확인한 뒤 저장하면 그 값이 `.env` 보다 우선합니다.
+재빌드가 필요 없어 실기기·터널처럼 주소가 매번 바뀌는 환경에서 편합니다.
+
+> ⚠️ **저장된 주소가 `.env` 를 이깁니다.** `app/_layout.tsx` 가 기동 때
+> `if (stored !== null) setApiUrl(stored)` 로 덮어씁니다. 한 번 저장하면 `.env` 를
+>아무리 고쳐도 안 바뀌므로, 목 모드에서 못 빠져나오면 **여기서** 고쳐야 합니다.
+>
+> 터널은 주소가 실행할 때마다 바뀌므로, 다시 켤 때마다 폰에 옛 주소가 남아
+> **또 목 모드로 뜹니다.** LAN 주소는 고정이라 한 번만 저장하면 됩니다.
 
 ---
 
